@@ -403,6 +403,34 @@
   const ROLE_LABEL = { AdminL1: 'Admin cấp 1', AdminL2: 'Admin cấp 2', Viewer: 'Người xem' };
   const ACTION_LABEL = { add: 'Thêm máy mới', update: 'Cập nhật máy', delete: 'Xoá máy' };
 
+  // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
+  // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
+  const API_URL = 'https://script.google.com/macros/s/AKfycbz9UBk8mtyPfZy0TU4V4NVtsMNBYoIhB5hu3mZgCwUX5wbDuzfthrptd1hHh6awe7LxIA/exec';
+
+  function apiGet(action, extraParams) {
+    const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
+    return fetch(API_URL + '?' + params.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (!json.ok) throw new Error(json.error || 'Lỗi không xác định');
+        return json.result;
+      });
+  }
+
+  function apiPost(action, data) {
+    const body = Object.assign({ action: action, token: state.token }, data || {});
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // tránh CORS preflight
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (!json.ok) throw new Error(json.error || 'Lỗi không xác định');
+        return json.result;
+      });
+  }
+
   let state = {
     token: localStorage.getItem('authToken') || '',
     hoTen: localStorage.getItem('hoTen') || '',
@@ -419,19 +447,18 @@
   // ---------- boot ----------
   window.onload = function () {
     if (state.token) {
-      google.script.run
-        .withSuccessHandler(function (res) {
+      apiGet('whoami')
+        .then(function (res) {
           state.hoTen = res.hoTen;
           state.role = res.role;
           localStorage.setItem('role', res.role);
           showDashboard();
         })
-        .withFailureHandler(function () {
+        .catch(function () {
           localStorage.removeItem('authToken');
           state.token = '';
           showAuth();
-        })
-        .whoAmI(state.token);
+        });
     } else {
       showAuth();
     }
@@ -465,12 +492,12 @@
   }
 
   function refreshPendingCount() {
-    google.script.run.withSuccessHandler(function (reqs) {
+    apiGet('listEditRequests').then(function (reqs) {
       const pending = reqs.filter(function (r) { return r.TrangThai === 'Chờ duyệt'; }).length;
       const el = document.getElementById('pendingCount');
       if (pending > 0) { el.textContent = pending; el.classList.remove('hidden'); }
       else { el.classList.add('hidden'); }
-    }).withFailureHandler(function () {}).listEditRequests(state.token);
+    }).catch(function () {});
   }
 
   // ---------- auth ----------
@@ -528,16 +555,14 @@
     };
 
     if (state.authMode === 'register') {
-      google.script.run.withSuccessHandler(onRegisterSuccess).withFailureHandler(onFailure)
-        .registerUser({ email: email, password: password, hoTen: hoTen });
+      apiPost('register', { email: email, password: password, hoTen: hoTen }).then(onRegisterSuccess).catch(onFailure);
     } else {
-      google.script.run.withSuccessHandler(onLoginSuccess).withFailureHandler(onFailure)
-        .loginUser({ email: email, password: password });
+      apiPost('login', { email: email, password: password }).then(onLoginSuccess).catch(onFailure);
     }
   }
 
   function logout() {
-    google.script.run.logoutUser(state.token);
+    apiPost('logout', {}).catch(function () {});
     localStorage.removeItem('authToken'); localStorage.removeItem('hoTen'); localStorage.removeItem('role');
     state.token = ''; state.role = ''; state.machines = [];
     document.getElementById('inpEmail').value = ''; document.getElementById('inpPassword').value = '';
@@ -548,8 +573,8 @@
   function loadMachines() {
     document.getElementById('refreshIcon').classList.add('spin');
     hideErrBanner();
-    google.script.run
-      .withSuccessHandler(function (data) {
+    apiGet('list')
+      .then(function (data) {
         document.getElementById('refreshIcon').classList.remove('spin');
         state.machines = data;
         if (state.activeCompany !== COMPANY_ALL) {
@@ -558,7 +583,7 @@
         }
         renderAll();
       })
-      .withFailureHandler(function (err) {
+      .catch(function (err) {
         document.getElementById('refreshIcon').classList.remove('spin');
         if ((err.message || '').indexOf('hết hạn') > -1) {
           localStorage.removeItem('authToken'); state.token = '';
@@ -567,8 +592,7 @@
         } else {
           showErrBanner('Không thể tải dữ liệu: ' + (err.message || ''));
         }
-      })
-      .listMachines(state.token);
+      });
   }
 
   function showErrBanner(msg) { const el = document.getElementById('errBanner'); el.textContent = '⚠ ' + msg; el.classList.remove('hidden'); }
@@ -843,8 +867,8 @@
     };
     const onFailure = function (err) { btn.disabled = false; showToast('Lưu thất bại: ' + (err.message || ''), 'error'); };
 
-    if (state.editId) google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateMachine(state.token, data);
-    else google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).addMachine(state.token, data);
+    if (state.editId) apiPost('update', { data: data }).then(onSuccess).catch(onFailure);
+    else apiPost('add', { data: data }).then(onSuccess).catch(onFailure);
   }
 
   // ---------- delete modal ----------
@@ -860,23 +884,21 @@
   function closeDeleteModal() { document.getElementById('deleteModal').classList.add('hidden'); }
 
   function confirmDelete() {
-    google.script.run
-      .withSuccessHandler(function (res) {
+    apiPost('delete', { id: state.deleteId })
+      .then(function (res) {
         closeDeleteModal();
         showToast(res && res.queued ? 'Đã gửi yêu cầu xoá, đang chờ duyệt.' : 'Đã xoá máy.');
         loadMachines();
       })
-      .withFailureHandler(function (err) { showToast('Thất bại: ' + (err.message || ''), 'error'); })
-      .deleteMachine(state.token, state.deleteId);
+      .catch(function (err) { showToast('Thất bại: ' + (err.message || ''), 'error'); });
   }
 
   // ---------- admin: quản lý tài khoản ----------
   function openAdminModal() {
     document.getElementById('adminModal').classList.remove('hidden');
     document.getElementById('adminList').innerHTML = '<div class="empty-mini">Đang tải...</div>';
-    google.script.run.withSuccessHandler(renderAdminList)
-      .withFailureHandler(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); })
-      .listUsers(state.token);
+    apiGet('listUsers').then(renderAdminList)
+      .catch(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); });
   }
   function closeAdminModal() { document.getElementById('adminModal').classList.add('hidden'); }
   function scopeLabel(scope) { if (!scope || scope === 'TatCa') return 'Toàn tập đoàn'; return scope; }
@@ -918,12 +940,14 @@
   }
 
   function adminReject(email) {
-    google.script.run.withSuccessHandler(function () { showToast('Đã từ chối tài khoản.'); openAdminModal(); })
-      .withFailureHandler(function (err) { showToast(err.message || 'Lỗi', 'error'); }).rejectUser(state.token, email);
+    apiPost('rejectUser', { email: email })
+      .then(function () { showToast('Đã từ chối tài khoản.'); openAdminModal(); })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
   }
   function adminRevoke(email) {
-    google.script.run.withSuccessHandler(function () { showToast('Đã thu hồi quyền truy cập.'); openAdminModal(); })
-      .withFailureHandler(function (err) { showToast(err.message || 'Lỗi', 'error'); }).revokeUser(state.token, email);
+    apiPost('revokeUser', { email: email })
+      .then(function () { showToast('Đã thu hồi quyền truy cập.'); openAdminModal(); })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
   }
 
   // ---------- permission modal ----------
@@ -943,19 +967,17 @@
   function confirmPermission() {
     const role = document.getElementById('permRole').value;
     const scope = document.getElementById('permScope').value.trim();
-    google.script.run
-      .withSuccessHandler(function () { closePermModal(); showToast('Đã cập nhật quyền truy cập.'); openAdminModal(); })
-      .withFailureHandler(function (err) { showToast(err.message || 'Lỗi', 'error'); })
-      .approveUser(state.token, state.permTargetEmail, role, scope);
+    apiPost('approveUser', { email: state.permTargetEmail, role: role, congTyDuocXem: scope })
+      .then(function () { closePermModal(); showToast('Đã cập nhật quyền truy cập.'); openAdminModal(); })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
   }
 
   // ---------- hàng đợi yêu cầu chỉnh sửa (AdminL1) ----------
   function openRequestQueueModal() {
     document.getElementById('requestQueueModal').classList.remove('hidden');
     document.getElementById('requestQueueList').innerHTML = '<div class="empty-mini">Đang tải...</div>';
-    google.script.run.withSuccessHandler(renderRequestQueue)
-      .withFailureHandler(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); })
-      .listEditRequests(state.token);
+    apiGet('listEditRequests').then(renderRequestQueue)
+      .catch(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); });
   }
   function closeRequestQueueModal() { document.getElementById('requestQueueModal').classList.add('hidden'); }
 
@@ -1000,12 +1022,14 @@
   }
 
   function approveRequest(requestId) {
-    google.script.run.withSuccessHandler(function () {
-      showToast('Đã duyệt yêu cầu.');
-      openRequestQueueModal();
-      refreshPendingCount();
-      loadMachines();
-    }).withFailureHandler(function (err) { showToast(err.message || 'Lỗi', 'error'); }).approveEditRequest(state.token, requestId);
+    apiPost('approveEditRequest', { requestId: requestId })
+      .then(function () {
+        showToast('Đã duyệt yêu cầu.');
+        openRequestQueueModal();
+        refreshPendingCount();
+        loadMachines();
+      })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
   }
 
   function openRejectReqModal(requestId) {
@@ -1016,21 +1040,22 @@
   function closeRejectReqModal() { document.getElementById('rejectReqModal').classList.add('hidden'); }
   function confirmRejectRequest() {
     const reason = document.getElementById('rejectReason').value.trim();
-    google.script.run.withSuccessHandler(function () {
-      closeRejectReqModal();
-      showToast('Đã từ chối yêu cầu.');
-      openRequestQueueModal();
-      refreshPendingCount();
-    }).withFailureHandler(function (err) { showToast(err.message || 'Lỗi', 'error'); }).rejectEditRequest(state.token, state.rejectTargetId, reason);
+    apiPost('rejectEditRequest', { requestId: state.rejectTargetId, reason: reason })
+      .then(function () {
+        closeRejectReqModal();
+        showToast('Đã từ chối yêu cầu.');
+        openRequestQueueModal();
+        refreshPendingCount();
+      })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
   }
 
   // ---------- yêu cầu của tôi (AdminL2) ----------
   function openMyRequestsModal() {
     document.getElementById('myRequestsModal').classList.remove('hidden');
     document.getElementById('myRequestsList').innerHTML = '<div class="empty-mini">Đang tải...</div>';
-    google.script.run.withSuccessHandler(renderMyRequests)
-      .withFailureHandler(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); })
-      .listMyRequests(state.token);
+    apiGet('listMyRequests').then(renderMyRequests)
+      .catch(function (err) { showToast('Lỗi: ' + (err.message || ''), 'error'); });
   }
   function closeMyRequestsModal() { document.getElementById('myRequestsModal').classList.add('hidden'); }
 
