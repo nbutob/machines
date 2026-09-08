@@ -88,6 +88,21 @@
   .chuyen-card{background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px; cursor:default;}
   .chuyen-card.clickable{cursor:pointer;}
   .chuyen-card.clickable:hover{border-color:var(--amber);}
+
+  /* ---- home / chọn xưởng ---- */
+  #homeScreen{min-height:100vh;}
+  .home-header{max-width:1000px; margin:0 auto; padding:24px 20px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  .home-body{max-width:1000px; margin:0 auto; padding:24px 20px 60px;}
+  .home-title{font-size:20px; font-weight:600; margin:0 0 4px;}
+  .home-subtitle{font-size:13px; color:var(--muted); margin:0 0 24px;}
+  .workshop-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;}
+  .workshop-card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; cursor:pointer; transition:border-color .15s, transform .15s; text-align:left;}
+  .workshop-card:hover{border-color:var(--amber); transform:translateY(-2px);}
+  .workshop-card.all{background:linear-gradient(135deg, rgba(245,166,35,.12), rgba(245,166,35,.03)); border-color:rgba(245,166,35,.3);}
+  .workshop-icon{font-size:26px; margin-bottom:10px;}
+  .workshop-name{font-size:14px; font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .workshop-total{font-size:26px; font-weight:700; color:var(--amber); margin:6px 0;}
+  .workshop-meta{font-size:11px; color:var(--muted); margin-bottom:10px;}
   .chuyen-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
   .chuyen-name{font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .chuyen-total{font-size:14px; font-weight:600; color:var(--amber);}
@@ -182,6 +197,24 @@
   </div>
 </div>
 
+<div id="homeScreen" class="hidden">
+  <div class="home-header">
+    <div class="header-left">
+      <div class="brand-icon" style="width:36px;height:36px;font-size:18px;">🏭</div>
+      <h1 class="display" style="font-size:16px;">Quản lý Máy móc</h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="hello">Xin chào, <b id="homeHelloName"></b> <span id="homeRoleBadge" class="role-badge">Admin</span></span>
+      <button class="btn btn-ghost" onclick="logout()">Đăng xuất</button>
+    </div>
+  </div>
+  <div class="home-body">
+    <h2 class="home-title">Chọn xưởng để xem</h2>
+    <p class="home-subtitle">Bấm vào 1 xưởng để xem chi tiết, hoặc chọn Tổng tập đoàn để xem toàn bộ.</p>
+    <div id="homeCards" class="workshop-grid"></div>
+  </div>
+</div>
+
 <div id="dashScreen" class="hidden">
   <header>
     <div class="header-inner">
@@ -191,6 +224,7 @@
       </div>
       <div class="header-right">
         <span class="hello">Xin chào, <b id="helloName"></b> <span id="roleBadge" class="role-badge">Admin</span></span>
+        <button id="homeBtn" class="btn btn-ghost hidden" onclick="goToHome()">🏠 Đổi xưởng</button>
         <button class="btn btn-ghost" onclick="loadMachines()"><span id="refreshIcon">⟳</span> Làm mới</button>
         <button id="addBtn" class="btn btn-primary hidden" style="width:auto; margin:0;" onclick="openAddModal()">+ Thêm máy</button>
         <button id="myReqBtn" class="btn btn-ghost hidden" onclick="openMyRequestsModal()">📋 Yêu cầu của tôi</button>
@@ -229,9 +263,19 @@
       </div>
     </div>
 
+    <div id="borrowedInPanel" class="panel hidden" style="margin-bottom:16px; border-color:rgba(177,140,245,.35);">
+      <h3>🔁 Máy đang mượn về xưởng này</h3>
+      <div id="borrowedInList"></div>
+    </div>
+
     <div id="companyBreakdownPanel" class="panel hidden" style="margin-bottom:16px;">
-      <h3>Tổng theo từng công ty</h3>
+      <h3>Tổng theo từng xưởng</h3>
       <div id="chartCongTy" class="chuyen-grid" style="grid-template-columns:1fr 1fr;"></div>
+    </div>
+
+    <div id="pivotTablePanel" class="panel hidden" style="margin-bottom:16px;">
+      <h3>Tổng theo xưởng &amp; loại máy</h3>
+      <div id="pivotTableWrap" style="overflow-x:auto;"></div>
     </div>
 
     <div class="charts-grid">
@@ -258,6 +302,13 @@
           <span>🔍</span>
           <input id="searchInp" placeholder="Tìm theo tên máy, loại, chuyền..." oninput="renderTable()">
         </div>
+        <select class="select-sm" id="filterLoaiMay" onchange="renderTable()"><option>Tất cả loại máy</option></select>
+        <select class="select-sm" id="filterViTri" onchange="renderTable()">
+          <option value="Tất cả">Mọi vị trí</option>
+          <option value="TaiXuong">Tại xưởng (đang dùng)</option>
+          <option value="Kho">Trong kho</option>
+          <option value="Muon">Đang cho mượn</option>
+        </select>
         <select class="select-sm" id="filterChuyen" onchange="renderTable()"><option>Tất cả</option></select>
         <select class="select-sm" id="filterTrangThai" onchange="renderTable()">
           <option>Tất cả</option>
@@ -282,11 +333,23 @@
     <div id="modalHint" class="info-msg hidden" style="margin:-4px 0 12px;"></div>
     <div class="field"><label>Tên máy</label><input class="inp" id="mTenMay" placeholder="VD: Máy dập CNC-01"></div>
     <div class="grid2">
-      <div class="field"><label>Loại máy</label><input class="inp" id="mLoaiMay" placeholder="VD: Máy dập"></div>
-      <div class="field"><label>Công ty</label><input class="inp" id="mCongTy" placeholder="VD: Công ty A" list="companyOptions"></div>
+      <div class="field"><label>Loại máy</label><input class="inp" id="mLoaiMay" placeholder="VD: Máy vắt sổ" list="machineTypeOptions"></div>
+      <div class="field"><label>Xưởng sở hữu</label><input class="inp" id="mCongTy" placeholder="VD: Xưởng 1" list="companyOptions"></div>
     </div>
     <datalist id="companyOptions"></datalist>
-    <div class="field"><label>Chuyền / Vị trí</label><input class="inp" id="mChuyen" placeholder="VD: Chuyền 1"></div>
+    <datalist id="machineTypeOptions"></datalist>
+
+    <div class="field">
+      <label>Vị trí hiện tại</label>
+      <select class="inp" id="mViTriLoai" onchange="toggleViTriFields()">
+        <option value="TaiXuong">Tại xưởng sở hữu — đang dùng ở chuyền</option>
+        <option value="Kho">Trong kho (chưa đưa vào dùng)</option>
+        <option value="Muon">Đang cho xưởng khác mượn</option>
+      </select>
+    </div>
+    <div class="field" id="fieldChuyen"><label>Chuyền</label><input class="inp" id="mChuyen" placeholder="VD: Chuyền 1"></div>
+    <div class="field hidden" id="fieldXuongMuon"><label>Xưởng đang mượn máy</label><input class="inp" id="mXuongDangMuon" placeholder="VD: Xưởng 2" list="companyOptions"></div>
+
     <div class="grid2">
       <div class="field"><label>Số lượng</label><input class="inp" type="number" min="0" id="mSoLuong" value="1"></div>
       <div class="field">
@@ -405,7 +468,7 @@
 
   // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
   // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
-  const API_URL = 'https://script.google.com/macros/s/AKfycbz9UBk8mtyPfZy0TU4V4NVtsMNBYoIhB5hu3mZgCwUX5wbDuzfthrptd1hHh6awe7LxIA/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycby6Ax8Hvrno5m_WRg7tL2TKujIRFVbphSYBJ3inyggwMlANtZPOhKxamTu4xjzfBdvEeQ/exec';
 
   function apiGet(action, extraParams) {
     const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
@@ -452,7 +515,7 @@
           state.hoTen = res.hoTen;
           state.role = res.role;
           localStorage.setItem('role', res.role);
-          showDashboard();
+          goToHome();
         })
         .catch(function () {
           localStorage.removeItem('authToken');
@@ -466,13 +529,105 @@
 
   function showAuth() {
     document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('dashScreen').classList.add('hidden');
     document.getElementById('authScreen').classList.remove('hidden');
+  }
+
+  // ---------- màn hình chọn xưởng ----------
+  function goToHome() {
+    document.getElementById('loadingScreen').classList.remove('hidden');
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('dashScreen').classList.add('hidden');
+    document.getElementById('homeScreen').classList.add('hidden');
+
+    apiGet('list')
+      .then(function (data) {
+        state.machines = data;
+        document.getElementById('loadingScreen').classList.add('hidden');
+
+        const companies = getCompanyList();
+        if (companies.length <= 1) {
+          enterDashboard(COMPANY_ALL);
+          return;
+        }
+
+        document.getElementById('homeHelloName').textContent = state.hoTen;
+        const hbadge = document.getElementById('homeRoleBadge');
+        hbadge.textContent = ROLE_LABEL[state.role] || state.role;
+        hbadge.className = 'role-badge' + (state.role === 'AdminL2' ? ' l2' : state.role === 'Viewer' ? ' viewer' : '');
+
+        renderHomeCards(companies);
+        document.getElementById('homeScreen').classList.remove('hidden');
+      })
+      .catch(function (err) {
+        document.getElementById('loadingScreen').classList.add('hidden');
+        if ((err.message || '').indexOf('hết hạn') > -1) {
+          localStorage.removeItem('authToken'); state.token = '';
+          showAuth();
+        } else {
+          enterDashboard(COMPANY_ALL);
+        }
+      });
+  }
+
+  function workshopStats(list) {
+    let total = 0, running = 0, maint = 0, down = 0;
+    const loaiSet = {};
+    list.forEach(function (m) {
+      const qty = Number(m.SoLuong) || 0;
+      total += qty;
+      if (m.LoaiMay) loaiSet[m.LoaiMay] = true;
+      if (m.TrangThai === 'Đang chạy') running += qty;
+      else if (m.TrangThai === 'Bảo trì') maint += qty;
+      else if (m.TrangThai === 'Ngừng hoạt động') down += qty;
+    });
+    return { total: total, running: running, maint: maint, down: down, loaiCount: Object.keys(loaiSet).length };
+  }
+
+  function segTrackHtml(stats) {
+    const maxSeg = stats.total || 1;
+    return '<div class="seg-track">' +
+      (stats.running > 0 ? '<div style="width:' + (stats.running / maxSeg * 100) + '%;background:var(--green);"></div>' : '') +
+      (stats.maint > 0 ? '<div style="width:' + (stats.maint / maxSeg * 100) + '%;background:var(--blue);"></div>' : '') +
+      (stats.down > 0 ? '<div style="width:' + (stats.down / maxSeg * 100) + '%;background:var(--red);"></div>' : '') +
+      '</div>';
+  }
+
+  function renderHomeCards(companies) {
+    const el = document.getElementById('homeCards');
+    const totalStats = workshopStats(state.machines);
+    let html = '<div class="workshop-card all" onclick="enterDashboard(\'' + COMPANY_ALL + '\')">' +
+      '<div class="workshop-icon">🏢</div>' +
+      '<div class="workshop-name">Tổng tập đoàn</div>' +
+      '<div class="workshop-total mono">' + totalStats.total + '</div>' +
+      '<div class="workshop-meta">' + companies.length + ' xưởng · ' + totalStats.loaiCount + ' loại máy</div>' +
+      segTrackHtml(totalStats) +
+      '</div>';
+
+    companies.forEach(function (c) {
+      const stats = workshopStats(state.machines.filter(function (m) { return m.CongTy === c; }));
+      html += '<div class="workshop-card" onclick="enterDashboard(\'' + c.replace(/'/g, "\\'") + '\')">' +
+        '<div class="workshop-icon">🏭</div>' +
+        '<div class="workshop-name" title="' + escapeHtml(c) + '">' + escapeHtml(c) + '</div>' +
+        '<div class="workshop-total mono">' + stats.total + '</div>' +
+        '<div class="workshop-meta">' + stats.loaiCount + ' loại máy</div>' +
+        segTrackHtml(stats) +
+        '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function enterDashboard(company) {
+    state.activeCompany = company;
+    document.getElementById('homeScreen').classList.add('hidden');
+    showDashboard();
   }
 
   function showDashboard() {
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('dashScreen').classList.remove('hidden');
     document.getElementById('helloName').textContent = state.hoTen;
 
@@ -486,8 +641,10 @@
     document.getElementById('reqQueueBtn').classList.toggle('hidden', !isL1);
     document.getElementById('addBtn').classList.toggle('hidden', !(isL1 || isL2));
     document.getElementById('myReqBtn').classList.toggle('hidden', !isL2);
+    document.getElementById('homeBtn').classList.toggle('hidden', getCompanyList().length <= 1);
 
     if (isL1) refreshPendingCount();
+    if (state.machines && state.machines.length) renderAll();
     loadMachines();
   }
 
@@ -535,7 +692,7 @@
       state.token = res.token; state.hoTen = res.hoTen; state.role = res.role;
       btn.disabled = false;
       setAuthMode(state.authMode);
-      showDashboard();
+      goToHome();
     };
     const onRegisterSuccess = function (res) {
       btn.disabled = false;
@@ -628,12 +785,32 @@
     renderCompanyTabs();
     const scoped = getScopedMachines();
     renderStats(scoped);
+    renderBorrowedInPanel();
     renderCompanyBreakdown();
+    renderPivotTable();
     renderChartLoai(scoped);
     renderChartChuyen(scoped);
     populateFilterOptions(scoped);
     populateCompanyDatalist();
+    populateMachineTypeDatalist();
     renderTable();
+  }
+
+  function renderBorrowedInPanel() {
+    const panel = document.getElementById('borrowedInPanel');
+    if (state.activeCompany === COMPANY_ALL) { panel.classList.add('hidden'); return; }
+    const list = state.machines.filter(function (m) {
+      return m.ViTriLoai === 'Muon' && m.XuongDangMuon === state.activeCompany;
+    });
+    if (list.length === 0) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    document.getElementById('borrowedInList').innerHTML = list.map(function (m) {
+      return '<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); font-size:12px;">' +
+        '<div><span style="color:var(--text);font-weight:500;">' + escapeHtml(m.TenMay) + '</span>' +
+        ' <span style="color:var(--muted);">(' + escapeHtml(m.LoaiMay) + ')</span></div>' +
+        '<div style="color:var(--purple);">Của ' + escapeHtml(m.CongTy) + ' · SL: <span class="mono">' + m.SoLuong + '</span></div>' +
+      '</div>';
+    }).join('');
   }
 
   function renderStats(scoped) {
@@ -688,6 +865,36 @@
     }).join('');
   }
 
+  function renderPivotTable() {
+    const panel = document.getElementById('pivotTablePanel');
+    const companies = getCompanyList();
+    if (state.activeCompany !== COMPANY_ALL || companies.length <= 1) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+
+    const map = {}; // { "Xưởng|Loại máy": soLuong }
+    state.machines.forEach(function (m) {
+      const congTy = m.CongTy || 'Chưa gán xưởng';
+      const loai = m.LoaiMay || 'Chưa phân loại';
+      const key = congTy + '|' + loai;
+      map[key] = (map[key] || 0) + (Number(m.SoLuong) || 0);
+    });
+    const rows = Object.entries(map)
+      .map(function (e) { const parts = e[0].split('|'); return { congTy: parts[0], loai: parts[1], soLuong: e[1] }; })
+      .sort(function (a, b) { return a.congTy.localeCompare(b.congTy) || a.loai.localeCompare(b.loai); });
+
+    if (rows.length === 0) { document.getElementById('pivotTableWrap').innerHTML = '<div class="empty-mini">Chưa có dữ liệu</div>'; return; }
+
+    document.getElementById('pivotTableWrap').innerHTML = '<table><thead><tr>' +
+      '<th>Phân xưởng</th><th>Loại máy</th><th style="text-align:right;">Số lượng</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td style="font-weight:500;">' + escapeHtml(r.congTy) + '</td>' +
+          '<td style="color:var(--text2);">' + escapeHtml(r.loai) + '</td>' +
+          '<td class="mono" style="text-align:right; color:var(--amber);">' + r.soLuong + '</td></tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
   function renderChartLoai(scoped) {
     const map = {};
     scoped.forEach(function (m) { const key = m.LoaiMay || 'Chưa phân loại'; map[key] = (map[key] || 0) + (Number(m.SoLuong) || 0); });
@@ -703,9 +910,17 @@
     }).join('');
   }
 
+  function locationDisplay(m) {
+    const v = m.ViTriLoai || 'TaiXuong';
+    if (v === 'Kho') return { text: 'Kho xưởng ' + (m.CongTy || ''), color: 'var(--muted)' };
+    if (v === 'Muon') return { text: (m.XuongDangMuon || 'Xưởng khác') + ' (cho mượn)', color: 'var(--purple)' };
+    const statusText = m.TrangThai === 'Đang chạy' ? 'Đang sử dụng' : (m.TrangThai || 'Đang sử dụng');
+    return { text: statusText + (m.Chuyen ? (' (' + m.Chuyen + ')') : ''), color: STATUS_COLOR[m.TrangThai] || STATUS_COLOR['Đang chạy'] };
+  }
+
   function renderChartChuyen(scoped) {
     const map = {};
-    scoped.forEach(function (m) {
+    scoped.filter(function (m) { return (m.ViTriLoai || 'TaiXuong') === 'TaiXuong'; }).forEach(function (m) {
       const key = m.Chuyen || 'Chưa gán chuyền';
       if (!map[key]) map[key] = { total: 0, running: 0, maint: 0, down: 0, count: 0 };
       const qty = Number(m.SoLuong) || 0;
@@ -716,7 +931,7 @@
     });
     const entries = Object.entries(map).sort(function (a, b) { return a[0].localeCompare(b[0]); });
     const el = document.getElementById('chartChuyen');
-    if (entries.length === 0) { el.innerHTML = '<div class="empty-mini">Chưa có dữ liệu</div>'; return; }
+    if (entries.length === 0) { el.innerHTML = '<div class="empty-mini">Chưa có dữ liệu (máy tại xưởng)</div>'; return; }
     el.innerHTML = entries.map(function (e) {
       const c = e[1], maxSeg = c.total || 1;
       return '<div class="chuyen-card"><div class="chuyen-top"><span class="chuyen-name" title="' + escapeHtml(e[0]) + '">' + escapeHtml(e[0]) + '</span>' +
@@ -732,10 +947,30 @@
   function populateFilterOptions(scoped) {
     const chuyenSel = document.getElementById('filterChuyen');
     const current = chuyenSel.value;
-    const chuyenList = Array.from(new Set(scoped.map(function (m) { return m.Chuyen; }).filter(Boolean))).sort();
+    const chuyenList = Array.from(new Set(scoped.filter(function (m) { return (m.ViTriLoai || 'TaiXuong') === 'TaiXuong'; }).map(function (m) { return m.Chuyen; }).filter(Boolean))).sort();
     chuyenSel.innerHTML = '<option>Tất cả</option>' + chuyenList.map(function (c) { return '<option>' + escapeHtml(c) + '</option>'; }).join('');
     if (chuyenList.indexOf(current) > -1) chuyenSel.value = current;
+
+    const loaiSel = document.getElementById('filterLoaiMay');
+    const currentLoai = loaiSel.value;
+    const loaiList = Array.from(new Set(scoped.map(function (m) { return m.LoaiMay; }).filter(Boolean))).sort();
+    loaiSel.innerHTML = '<option>Tất cả loại máy</option>' + loaiList.map(function (l) { return '<option>' + escapeHtml(l) + '</option>'; }).join('');
+    if (loaiList.indexOf(currentLoai) > -1) loaiSel.value = currentLoai;
   }
+  // Danh sách gợi ý loại máy may công nghiệp thường gặp — có thể tự thêm/sửa tuỳ xưởng thực tế.
+  // Đây chỉ là GỢI Ý (datalist), người dùng vẫn gõ được tên khác ngoài danh sách này.
+  const MACHINE_TYPE_PRESETS = [
+    'Máy 1 kim', 'Máy 2 kim', 'Máy vắt sổ', 'Máy kansai (vắt sổ nhiều kim)',
+    'Máy thùa khuy', 'Máy đính cúc', 'Máy đính bọ', 'Máy zic zắc',
+    'Máy cắt vải', 'Máy ép mex', 'Máy là hơi', 'Máy dò kim', 'Máy bổ túi', 'Máy lập trình'
+  ];
+
+  function populateMachineTypeDatalist() {
+    const used = Array.from(new Set(state.machines.map(function (m) { return m.LoaiMay; }).filter(Boolean)));
+    const merged = Array.from(new Set(MACHINE_TYPE_PRESETS.concat(used))).sort();
+    document.getElementById('machineTypeOptions').innerHTML = merged.map(function (t) { return '<option value="' + escapeHtml(t) + '">'; }).join('');
+  }
+
   function populateCompanyDatalist() {
     const list = getCompanyList();
     document.getElementById('companyOptions').innerHTML = list.map(function (c) { return '<option value="' + escapeHtml(c) + '">'; }).join('');
@@ -745,12 +980,16 @@
     const search = document.getElementById('searchInp').value.toLowerCase().trim();
     const fChuyen = document.getElementById('filterChuyen').value;
     const fTrang = document.getElementById('filterTrangThai').value;
+    const fLoaiMay = document.getElementById('filterLoaiMay').value;
+    const fViTri = document.getElementById('filterViTri').value;
     const scoped = getScopedMachines();
     const canEdit = state.role === 'AdminL1' || state.role === 'AdminL2';
 
     const filtered = scoped.filter(function (m) {
       if (fChuyen !== 'Tất cả' && m.Chuyen !== fChuyen) return false;
       if (fTrang !== 'Tất cả' && m.TrangThai !== fTrang) return false;
+      if (fLoaiMay !== 'Tất cả loại máy' && m.LoaiMay !== fLoaiMay) return false;
+      if (fViTri !== 'Tất cả' && (m.ViTriLoai || 'TaiXuong') !== fViTri) return false;
       if (search) {
         const hay = ((m.TenMay || '') + ' ' + (m.LoaiMay || '') + ' ' + (m.Chuyen || '') + ' ' + (m.CongTy || '')).toLowerCase();
         return hay.indexOf(search) > -1;
@@ -765,14 +1004,13 @@
       wrap.innerHTML = '<div class="empty-table">' + (state.machines.length === 0 ? 'Chưa có máy nào.' + (canEdit ? ' Bấm "Thêm máy" để bắt đầu.' : '') : 'Không tìm thấy máy phù hợp.') + '</div>';
     } else {
       let rows = filtered.map(function (m) {
-        const color = STATUS_COLOR[m.TrangThai] || STATUS_COLOR['Đang chạy'];
+        const loc = locationDisplay(m);
         return '<tr>' +
           '<td style="font-weight:500;">' + escapeHtml(m.TenMay) + '</td>' +
           (showCongTyCol ? '<td style="color:var(--text2);">' + escapeHtml(m.CongTy) + '</td>' : '') +
           '<td style="color:var(--text2);">' + escapeHtml(m.LoaiMay) + '</td>' +
-          '<td style="color:var(--text2);">' + escapeHtml(m.Chuyen) + '</td>' +
+          '<td><span class="status-pill"><span class="dot" style="background:' + loc.color + '"></span>' + escapeHtml(loc.text) + '</span></td>' +
           '<td class="mono" style="text-align:right; color:var(--amber);">' + m.SoLuong + '</td>' +
-          '<td><span class="status-pill"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(m.TrangThai) + '</span></td>' +
           '<td style="color:var(--muted); font-size:12px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + escapeHtml(m.GhiChu) + '">' + escapeHtml(m.GhiChu) + '</td>' +
           (canEdit ? ('<td><div class="row-actions">' +
             '<button class="icon-btn" onclick="openEditModal(\'' + m.ID + '\')">✎</button>' +
@@ -781,7 +1019,7 @@
         '</tr>';
       }).join('');
       wrap.innerHTML = '<div style="overflow-x:auto;"><table><thead><tr>' +
-        '<th>Tên máy</th>' + (showCongTyCol ? '<th>Công ty</th>' : '') + '<th>Loại máy</th><th>Chuyền</th><th style="text-align:right;">Số lượng</th><th>Trạng thái</th><th>Ghi chú</th>' +
+        '<th>Tên máy</th>' + (showCongTyCol ? '<th>Xưởng sở hữu</th>' : '') + '<th>Loại máy</th><th>Hiện trạng</th><th style="text-align:right;">Số lượng</th><th>Ghi chú</th>' +
         (canEdit ? '<th style="text-align:right;">Thao tác</th>' : '') +
         '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
@@ -799,12 +1037,15 @@
     document.getElementById('mTenMay').value = '';
     document.getElementById('mLoaiMay').value = '';
     document.getElementById('mCongTy').value = state.activeCompany !== COMPANY_ALL ? state.activeCompany : '';
+    document.getElementById('mViTriLoai').value = 'TaiXuong';
     document.getElementById('mChuyen').value = '';
+    document.getElementById('mXuongDangMuon').value = '';
     document.getElementById('mSoLuong').value = 1;
     document.getElementById('mTrangThai').value = 'Đang chạy';
     document.getElementById('mGhiChu').value = '';
     document.getElementById('saveBtn').textContent = 'Thêm máy';
     toggleModalHint();
+    toggleViTriFields();
     document.getElementById('machineModal').classList.remove('hidden');
   }
 
@@ -816,13 +1057,22 @@
     document.getElementById('mTenMay').value = m.TenMay || '';
     document.getElementById('mLoaiMay').value = m.LoaiMay || '';
     document.getElementById('mCongTy').value = m.CongTy || '';
+    document.getElementById('mViTriLoai').value = m.ViTriLoai || 'TaiXuong';
     document.getElementById('mChuyen').value = m.Chuyen || '';
+    document.getElementById('mXuongDangMuon').value = m.XuongDangMuon || '';
     document.getElementById('mSoLuong').value = m.SoLuong || 0;
     document.getElementById('mTrangThai').value = m.TrangThai || 'Đang chạy';
     document.getElementById('mGhiChu').value = m.GhiChu || '';
     document.getElementById('saveBtn').textContent = 'Lưu thay đổi';
     toggleModalHint();
+    toggleViTriFields();
     document.getElementById('machineModal').classList.remove('hidden');
+  }
+
+  function toggleViTriFields() {
+    const val = document.getElementById('mViTriLoai').value;
+    document.getElementById('fieldChuyen').classList.toggle('hidden', val !== 'TaiXuong');
+    document.getElementById('fieldXuongMuon').classList.toggle('hidden', val !== 'Muon');
   }
 
   function toggleModalHint() {
@@ -838,18 +1088,29 @@
   function closeModal() { document.getElementById('machineModal').classList.add('hidden'); }
 
   function saveMachine() {
+    const viTriLoai = document.getElementById('mViTriLoai').value;
     const data = {
       ID: state.editId,
       TenMay: document.getElementById('mTenMay').value.trim(),
       LoaiMay: document.getElementById('mLoaiMay').value.trim(),
       CongTy: document.getElementById('mCongTy').value.trim(),
-      Chuyen: document.getElementById('mChuyen').value.trim(),
+      ViTriLoai: viTriLoai,
+      Chuyen: viTriLoai === 'TaiXuong' ? document.getElementById('mChuyen').value.trim() : '',
+      XuongDangMuon: viTriLoai === 'Muon' ? document.getElementById('mXuongDangMuon').value.trim() : '',
       SoLuong: document.getElementById('mSoLuong').value,
       TrangThai: document.getElementById('mTrangThai').value,
       GhiChu: document.getElementById('mGhiChu').value.trim()
     };
-    if (!data.TenMay || !data.LoaiMay || !data.CongTy || !data.Chuyen) {
-      showToast('Vui lòng nhập đủ Tên máy, Loại máy, Công ty và Chuyền.', 'error');
+    if (!data.TenMay || !data.LoaiMay || !data.CongTy) {
+      showToast('Vui lòng nhập đủ Tên máy, Loại máy và Xưởng sở hữu.', 'error');
+      return;
+    }
+    if (viTriLoai === 'TaiXuong' && !data.Chuyen) {
+      showToast('Vui lòng nhập Chuyền (vì máy đang tại xưởng sở hữu).', 'error');
+      return;
+    }
+    if (viTriLoai === 'Muon' && !data.XuongDangMuon) {
+      showToast('Vui lòng nhập tên xưởng đang mượn máy.', 'error');
       return;
     }
     const btn = document.getElementById('saveBtn');
