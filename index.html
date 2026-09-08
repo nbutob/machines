@@ -5,6 +5,7 @@
 <base target="_top">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#14171C; --panel:#1E222A; --panel2:#181B21; --border:#2C313C; --border2:#3A404C;
@@ -227,8 +228,10 @@
         <button id="homeBtn" class="btn btn-ghost hidden" onclick="goToHome()">🏠 Đổi xưởng</button>
         <button class="btn btn-ghost" onclick="loadMachines()"><span id="refreshIcon">⟳</span> Làm mới</button>
         <button id="addBtn" class="btn btn-primary hidden" style="width:auto; margin:0;" onclick="openAddModal()">+ Thêm máy</button>
+        <button id="importBtn" class="btn btn-ghost hidden" onclick="openImportModal()">📥 Nhập Excel</button>
         <button id="myReqBtn" class="btn btn-ghost hidden" onclick="openMyRequestsModal()">📋 Yêu cầu của tôi</button>
         <button id="reqQueueBtn" class="btn btn-ghost hidden" onclick="openRequestQueueModal()">🕒 Yêu cầu chỉnh sửa<span id="pendingCount" class="badge-count hidden">0</span></button>
+        <button id="workshopMgmtBtn" class="btn btn-ghost hidden" onclick="openWorkshopModal()">🏭 Quản lý xưởng</button>
         <button id="adminBtn" class="btn btn-ghost hidden" onclick="openAdminModal()">👤 Quản lý tài khoản</button>
         <button class="btn btn-ghost" onclick="logout()">Đăng xuất</button>
       </div>
@@ -454,6 +457,47 @@
   </div>
 </div>
 
+<!-- Quản lý danh mục xưởng (AdminL1) -->
+<div id="workshopModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Quản lý danh mục xưởng</h3>
+      <button class="modal-close" onclick="closeWorkshopModal()">✕</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <input class="inp" id="newWorkshopName" placeholder="VD: Xưởng 3" onkeydown="if(event.key==='Enter')addWorkshopSubmit()">
+      <button class="btn btn-primary" style="width:auto; margin:0; white-space:nowrap;" onclick="addWorkshopSubmit()">+ Thêm</button>
+    </div>
+    <div id="workshopList" style="max-height:320px; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- Nhập máy từ Excel (AdminL1) -->
+<div id="importModal" class="overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h3>Nhập danh sách máy từ Excel</h3>
+      <button class="modal-close" onclick="closeImportModal()">✕</button>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin:-6px 0 14px;">
+      File Excel (.xlsx) cần có dòng tiêu đề đúng các cột sau (thứ tự không quan trọng):<br>
+      <span class="mono" style="color:var(--text2);">TenMay, LoaiMay, CongTy, ViTriLoai, Chuyen, XuongDangMuon, SoLuong, TrangThai, GhiChu</span><br>
+      — ViTriLoai nhận: "Tại xưởng" / "Kho" / "Mượn" (để trống = Tại xưởng). TrangThai nhận: "Đang chạy" / "Bảo trì" / "Ngừng hoạt động".
+    </p>
+    <div id="importHint" class="info-msg hidden" style="margin-bottom:12px;"></div>
+    <button class="btn btn-ghost" style="margin-bottom:14px;" onclick="downloadTemplate()">⬇ Tải file mẫu (.xlsx)</button>
+    <div class="field">
+      <label>Chọn file Excel</label>
+      <input class="inp" type="file" id="importFileInput" accept=".xlsx,.xls" onchange="handleImportFile(event)">
+    </div>
+    <div id="importPreview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeImportModal()">Huỷ</button>
+      <button class="btn btn-primary" style="margin:0;" id="importConfirmBtn" onclick="confirmImport()" disabled>Nhập dữ liệu</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="hidden"></div>
 
 <script>
@@ -464,11 +508,11 @@
   };
   const COMPANY_ALL = '__ALL__';
   const ROLE_LABEL = { AdminL1: 'Admin cấp 1', AdminL2: 'Admin cấp 2', Viewer: 'Người xem' };
-  const ACTION_LABEL = { add: 'Thêm máy mới', update: 'Cập nhật máy', delete: 'Xoá máy' };
+  const ACTION_LABEL = { add: 'Thêm máy mới', update: 'Cập nhật máy', delete: 'Xoá máy', bulkAdd: 'Nhập Excel hàng loạt' };
 
   // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
   // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
-  const API_URL = 'https://script.google.com/macros/s/AKfycby6Ax8Hvrno5m_WRg7tL2TKujIRFVbphSYBJ3inyggwMlANtZPOhKxamTu4xjzfBdvEeQ/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxquU414ECEhQxsbkKKfqn3T-dVG3O7vMk-lmyGnWxXnmzHpyUKAwowDRP2-GQajLzM3A/exec';
 
   function apiGet(action, extraParams) {
     const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
@@ -500,11 +544,13 @@
     role: localStorage.getItem('role') || '',
     authMode: 'login',
     machines: [],
+    workshops: [], // danh mục xưởng (từ sheet DanhMucXuong, gộp thêm tên xuất hiện trong dữ liệu máy)
     activeCompany: COMPANY_ALL,
     editId: null,
     deleteId: null,
     permTargetEmail: null,
-    rejectTargetId: null
+    rejectTargetId: null,
+    importRows: null
   };
 
   // ---------- boot ----------
@@ -541,13 +587,14 @@
     document.getElementById('dashScreen').classList.add('hidden');
     document.getElementById('homeScreen').classList.add('hidden');
 
-    apiGet('list')
-      .then(function (data) {
-        state.machines = data;
+    Promise.all([apiGet('list'), apiGet('listWorkshops')])
+      .then(function (results) {
+        state.machines = results[0];
+        state.workshops = results[1];
         document.getElementById('loadingScreen').classList.add('hidden');
 
-        const companies = getCompanyList();
-        if (companies.length <= 1) {
+        const workshops = getWorkshopList();
+        if (workshops.length <= 1) {
           enterDashboard(COMPANY_ALL);
           return;
         }
@@ -557,7 +604,7 @@
         hbadge.textContent = ROLE_LABEL[state.role] || state.role;
         hbadge.className = 'role-badge' + (state.role === 'AdminL2' ? ' l2' : state.role === 'Viewer' ? ' viewer' : '');
 
-        renderHomeCards(companies);
+        renderHomeCards(workshops);
         document.getElementById('homeScreen').classList.remove('hidden');
       })
       .catch(function (err) {
@@ -639,9 +686,11 @@
     const isL2 = state.role === 'AdminL2';
     document.getElementById('adminBtn').classList.toggle('hidden', !isL1);
     document.getElementById('reqQueueBtn').classList.toggle('hidden', !isL1);
+    document.getElementById('workshopMgmtBtn').classList.toggle('hidden', !isL1);
+    document.getElementById('importBtn').classList.toggle('hidden', !(isL1 || isL2));
     document.getElementById('addBtn').classList.toggle('hidden', !(isL1 || isL2));
     document.getElementById('myReqBtn').classList.toggle('hidden', !isL2);
-    document.getElementById('homeBtn').classList.toggle('hidden', getCompanyList().length <= 1);
+    document.getElementById('homeBtn').classList.toggle('hidden', getWorkshopList().length <= 1);
 
     if (isL1) refreshPendingCount();
     if (state.machines && state.machines.length) renderAll();
@@ -730,14 +779,16 @@
   function loadMachines() {
     document.getElementById('refreshIcon').classList.add('spin');
     hideErrBanner();
-    apiGet('list')
-      .then(function (data) {
+    Promise.all([apiGet('list'), apiGet('listWorkshops')])
+      .then(function (results) {
         document.getElementById('refreshIcon').classList.remove('spin');
-        state.machines = data;
+        state.machines = results[0];
+        state.workshops = results[1];
         if (state.activeCompany !== COMPANY_ALL) {
-          const stillExists = data.some(function (m) { return m.CongTy === state.activeCompany; });
+          const stillExists = state.workshops.indexOf(state.activeCompany) > -1;
           if (!stillExists) state.activeCompany = COMPANY_ALL;
         }
+        document.getElementById('homeBtn').classList.toggle('hidden', getWorkshopList().length <= 1);
         renderAll();
       })
       .catch(function (err) {
@@ -763,6 +814,7 @@
 
   // ---------- company scoping ----------
   function getCompanyList() { return Array.from(new Set(state.machines.map(function (m) { return m.CongTy; }).filter(Boolean))).sort(); }
+  function getWorkshopList() { return state.workshops.slice(); } // danh mục xưởng (đăng ký sẵn, không phụ thuộc đã có máy hay chưa)
   function getScopedMachines() {
     if (state.activeCompany === COMPANY_ALL) return state.machines;
     return state.machines.filter(function (m) { return m.CongTy === state.activeCompany; });
@@ -770,14 +822,20 @@
   function setActiveCompany(c) { state.activeCompany = c; renderAll(); }
 
   function renderCompanyTabs() {
-    const companies = getCompanyList();
+    const workshops = getWorkshopList();
     const el = document.getElementById('companyTabs');
-    if (companies.length <= 1) { el.innerHTML = ''; return; }
-    let html = '<button class="company-tab' + (state.activeCompany === COMPANY_ALL ? ' active' : '') + '" onclick="setActiveCompany(\'' + COMPANY_ALL + '\')">🏢 Tổng tập đoàn</button>';
-    companies.forEach(function (c) {
-      html += '<button class="company-tab' + (state.activeCompany === c ? ' active' : '') + '" onclick="setActiveCompany(\'' + c.replace(/'/g, "\\'") + '\')">' + escapeHtml(c) + '</button>';
-    });
-    el.innerHTML = html;
+    if (workshops.length === 0) {
+      el.innerHTML = state.role === 'AdminL1'
+        ? '<button class="btn btn-ghost" style="padding:7px 14px; font-size:12px;" onclick="openWorkshopModal()">+ Thêm xưởng đầu tiên vào danh mục</button>'
+        : '';
+      return;
+    }
+    if (workshops.length === 1) { el.innerHTML = ''; return; }
+    const options = '<option value="' + COMPANY_ALL + '">🏢 Tổng xưởng</option>' +
+      workshops.map(function (c) { return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+    el.innerHTML = '<label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">Xem theo xưởng:' +
+      '<select class="select-sm" id="companySelect" onchange="setActiveCompany(this.value)" style="font-weight:600; min-width:200px;">' + options + '</select></label>';
+    document.getElementById('companySelect').value = state.activeCompany;
   }
 
   // ---------- render dashboard ----------
@@ -972,7 +1030,7 @@
   }
 
   function populateCompanyDatalist() {
-    const list = getCompanyList();
+    const list = getWorkshopList();
     document.getElementById('companyOptions').innerHTML = list.map(function (c) { return '<option value="' + escapeHtml(c) + '">'; }).join('');
   }
 
@@ -1245,6 +1303,13 @@
   function fieldRow(label, val) { return val ? ('<div><b>' + label + ':</b> ' + escapeHtml(val) + '</div>') : ''; }
 
   function renderRequestDetail(actionType, data) {
+    if (actionType === 'bulkAdd') {
+      const rows = Array.isArray(data) ? data : [];
+      const byCongTy = {};
+      rows.forEach(function (r) { const k = r.CongTy || '(chưa rõ)'; byCongTy[k] = (byCongTy[k] || 0) + 1; });
+      const breakdown = Object.entries(byCongTy).map(function (e) { return e[0] + ': ' + e[1] + ' dòng'; }).join(', ');
+      return '<div><b>Tổng số dòng:</b> ' + rows.length + '</div><div><b>Theo xưởng:</b> ' + escapeHtml(breakdown) + '</div>';
+    }
     if (actionType === 'delete') {
       return fieldRow('Tên máy', data.TenMay) + fieldRow('Loại máy', data.LoaiMay) + fieldRow('Công ty', data.CongTy) + fieldRow('Chuyền', data.Chuyen);
     }
@@ -1338,6 +1403,165 @@
         '<div class="req-detail">' + renderRequestDetail(r.LoaiHanhDong, data) + (r.GhiChu ? ('<div style="margin-top:6px; color:var(--red);"><b>Lý do từ chối:</b> ' + escapeHtml(r.GhiChu) + '</div>') : '') + '</div>' +
       '</div>';
     }).join('');
+  }
+
+  // ---------- quản lý danh mục xưởng (AdminL1) ----------
+  function openWorkshopModal() {
+    document.getElementById('newWorkshopName').value = '';
+    document.getElementById('workshopModal').classList.remove('hidden');
+    renderWorkshopList();
+  }
+  function closeWorkshopModal() { document.getElementById('workshopModal').classList.add('hidden'); }
+
+  function renderWorkshopList() {
+    const el = document.getElementById('workshopList');
+    const workshops = getWorkshopList();
+    if (workshops.length === 0) { el.innerHTML = '<div class="empty-mini">Chưa có xưởng nào.</div>'; return; }
+    const dataCompanies = getCompanyList();
+    el.innerHTML = workshops.map(function (w) {
+      const hasData = dataCompanies.indexOf(w) > -1;
+      return '<div style="display:flex; align-items:center; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--border); font-size:13px;">' +
+        '<span>' + escapeHtml(w) + (hasData ? '' : ' <span style="color:var(--muted); font-size:11px;">(chưa có máy)</span>') + '</span>' +
+        '<button class="icon-btn danger" onclick="deleteWorkshopConfirm(\'' + w.replace(/'/g, "\\'") + '\')">🗑</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function addWorkshopSubmit() {
+    const name = document.getElementById('newWorkshopName').value.trim();
+    if (!name) { showToast('Vui lòng nhập tên xưởng.', 'error'); return; }
+    apiPost('addWorkshop', { name: name })
+      .then(function () {
+        document.getElementById('newWorkshopName').value = '';
+        showToast('Đã thêm xưởng vào danh mục.');
+        return apiGet('listWorkshops');
+      })
+      .then(function (list) { state.workshops = list; renderWorkshopList(); renderCompanyTabs(); })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
+  }
+
+  function deleteWorkshopConfirm(name) {
+    if (!confirm('Xoá "' + name + '" khỏi danh mục? (Máy móc đã nhập theo xưởng này sẽ KHÔNG bị xoá.)')) return;
+    apiPost('deleteWorkshop', { name: name })
+      .then(function () {
+        showToast('Đã xoá khỏi danh mục.');
+        return apiGet('listWorkshops');
+      })
+      .then(function (list) { state.workshops = list; renderWorkshopList(); renderCompanyTabs(); })
+      .catch(function (err) { showToast(err.message || 'Lỗi', 'error'); });
+  }
+
+  // ---------- nhập Excel (AdminL1) ----------
+  function openImportModal() {
+    document.getElementById('importFileInput').value = '';
+    document.getElementById('importPreview').innerHTML = '';
+    document.getElementById('importConfirmBtn').disabled = true;
+    state.importRows = null;
+    const hint = document.getElementById('importHint');
+    if (state.role === 'AdminL2') {
+      hint.textContent = 'ℹ Bạn là Admin cấp 2: file sau khi nhập sẽ được gửi thành 1 yêu cầu, cần Admin cấp 1 duyệt mới được áp dụng vào hệ thống.';
+      hint.classList.remove('hidden');
+    } else {
+      hint.classList.add('hidden');
+    }
+    document.getElementById('importModal').classList.remove('hidden');
+  }
+  function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
+
+  function downloadTemplate() {
+    const headers = ['TenMay', 'LoaiMay', 'CongTy', 'ViTriLoai', 'Chuyen', 'XuongDangMuon', 'SoLuong', 'TrangThai', 'GhiChu'];
+    const sample = [
+      { TenMay: 'Máy 1 kim Siruba', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Tại xưởng', Chuyen: 'Chuyền 2', XuongDangMuon: '', SoLuong: 5, TrangThai: 'Đang chạy', GhiChu: '' },
+      { TenMay: 'Máy vắt sổ Kansai', LoaiMay: 'Máy vắt sổ', CongTy: 'Xưởng 1', ViTriLoai: 'Kho', Chuyen: '', XuongDangMuon: '', SoLuong: 2, TrangThai: 'Đang chạy', GhiChu: '' },
+      { TenMay: 'Máy 1 kim Juki', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Mượn', Chuyen: '', XuongDangMuon: 'Xưởng 2', SoLuong: 1, TrangThai: 'Đang chạy', GhiChu: 'Cho Xưởng 2 mượn từ 01/09' }
+    ];
+    const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'MayMoc');
+    XLSX.writeFile(wb, 'mau_nhap_may_moc.xlsx');
+  }
+
+  function normalizeViTriLoai_(raw) {
+    const v = String(raw || '').trim().toLowerCase();
+    if (!v || v.indexOf('tại xưởng') > -1 || v.indexOf('tai xuong') > -1) return 'TaiXuong';
+    if (v.indexOf('kho') > -1) return 'Kho';
+    if (v.indexOf('mượn') > -1 || v.indexOf('muon') > -1) return 'Muon';
+    return 'TaiXuong';
+  }
+  function normalizeTrangThai_(raw) {
+    const v = String(raw || '').trim();
+    if (v === 'Đang chạy' || v === 'Bảo trì' || v === 'Ngừng hoạt động') return v;
+    return 'Đang chạy';
+  }
+
+  function handleImportFile(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        const rows = raw.map(function (r) {
+          return {
+            TenMay: String(r.TenMay || '').trim(),
+            LoaiMay: String(r.LoaiMay || '').trim(),
+            CongTy: String(r.CongTy || '').trim(),
+            ViTriLoai: normalizeViTriLoai_(r.ViTriLoai),
+            Chuyen: String(r.Chuyen || '').trim(),
+            XuongDangMuon: String(r.XuongDangMuon || '').trim(),
+            SoLuong: Number(r.SoLuong) || 0,
+            TrangThai: normalizeTrangThai_(r.TrangThai),
+            GhiChu: String(r.GhiChu || '').trim()
+          };
+        }).filter(function (r) { return r.TenMay; }); // bỏ qua dòng trống
+
+        const invalid = rows.filter(function (r) { return !r.LoaiMay || !r.CongTy; }).length;
+        state.importRows = rows;
+
+        document.getElementById('importPreview').innerHTML =
+          '<div class="info-msg" style="margin-top:10px;">Đọc được <b>' + rows.length + '</b> dòng máy hợp lệ' +
+          (invalid > 0 ? ', <span style="color:var(--red);">' + invalid + ' dòng thiếu Loại máy/Xưởng sở hữu sẽ bị bỏ qua khi nhập</span>' : '') +
+          '. Bấm "Nhập dữ liệu" để xác nhận.</div>';
+        document.getElementById('importConfirmBtn').disabled = rows.length === 0;
+      } catch (err) {
+        document.getElementById('importPreview').innerHTML = '<div class="err-msg">⚠ Không đọc được file: ' + (err.message || err) + '</div>';
+        document.getElementById('importConfirmBtn').disabled = true;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function confirmImport() {
+    if (!state.importRows || state.importRows.length === 0) return;
+    const validRows = state.importRows.filter(function (r) { return r.TenMay && r.LoaiMay && r.CongTy; });
+    const btn = document.getElementById('importConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Đang nhập...';
+    apiPost('bulkAdd', { rows: validRows })
+      .then(function (res) {
+        btn.disabled = false;
+        btn.textContent = 'Nhập dữ liệu';
+        closeImportModal();
+        if (res.queued) {
+          showToast('Đã gửi yêu cầu nhập ' + res.count + ' dòng, đang chờ Admin cấp 1 duyệt.');
+        } else {
+          let msg = 'Đã nhập ' + res.count + ' / ' + res.total + ' dòng.';
+          showToast(msg, res.errors && res.errors.length ? 'error' : 'ok');
+          if (res.errors && res.errors.length) {
+            console.warn('Lỗi khi nhập Excel:', res.errors);
+          }
+        }
+        loadMachines();
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Nhập dữ liệu';
+        showToast('Nhập thất bại: ' + (err.message || ''), 'error');
+      });
   }
 </script>
 </body>
