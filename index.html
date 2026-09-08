@@ -512,7 +512,7 @@
 
   // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
   // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxquU414ECEhQxsbkKKfqn3T-dVG3O7vMk-lmyGnWxXnmzHpyUKAwowDRP2-GQajLzM3A/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzlksBftEQSOzVuxSVcb1BTGoYo3BGH5fM9yYwR7Rhl46qWwoh9_Z29u3CLHtLjXz6ZZg/exec';
 
   function apiGet(action, extraParams) {
     const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
@@ -830,7 +830,8 @@
         : '';
       return;
     }
-    if (workshops.length === 1) { el.innerHTML = ''; return; }
+    // Luôn hiện dropdown miễn là có ít nhất 1 xưởng trong danh mục (kể cả chỉ 1 xưởng),
+    // để người dùng luôn thấy rõ đang xem ở phạm vi nào.
     const options = '<option value="' + COMPANY_ALL + '">🏢 Tổng xưởng</option>' +
       workshops.map(function (c) { return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
     el.innerHTML = '<label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">Xem theo xưởng:' +
