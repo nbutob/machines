@@ -1191,6 +1191,10 @@
       showToast('Vui lòng nhập đủ Tên máy, Loại máy và Xưởng sở hữu.', 'error');
       return;
     }
+    if (looksLikeChuyenName_(data.CongTy)) {
+      const confirmed = confirm('Ô "Xưởng sở hữu" bạn đang nhập là "' + data.CongTy + '" — nghe giống tên CHUYỀN hơn là tên XƯỞNG.\n\nChuyền phải nằm trong 1 Xưởng (ví dụ: Xưởng sở hữu = "Xưởng 1", Chuyền = "Chuyền 1"), không phải ngang hàng.\n\nBấm OK nếu bạn chắc chắn đây đúng là tên xưởng. Bấm Huỷ để sửa lại.');
+      if (!confirmed) return;
+    }
     if (viTriLoai === 'TaiXuong' && !data.Chuyen) {
       showToast('Vui lòng nhập Chuyền (vì máy đang tại xưởng sở hữu).', 'error');
       return;
@@ -1455,9 +1459,17 @@
     }).join('');
   }
 
+  function looksLikeChuyenName_(name) {
+    return /^chuy(ề|e)n/i.test(String(name || '').trim());
+  }
+
   function addWorkshopSubmit() {
     const name = document.getElementById('newWorkshopName').value.trim();
     if (!name) { showToast('Vui lòng nhập tên xưởng.', 'error'); return; }
+    if (looksLikeChuyenName_(name)) {
+      const confirmed = confirm('Tên "' + name + '" nghe giống tên CHUYỀN hơn là tên XƯỞNG.\n\nDanh mục này dùng để liệt kê các XƯỞNG (VD: Xưởng 1, Xưởng 2). Chuyền được nhập riêng khi thêm từng máy, không nằm ở danh mục này.\n\nBấm OK nếu bạn chắc chắn đây đúng là tên xưởng. Bấm Huỷ để sửa lại.');
+      if (!confirmed) return;
+    }
     apiPost('addWorkshop', { name: name })
       .then(function () {
         document.getElementById('newWorkshopName').value = '';
