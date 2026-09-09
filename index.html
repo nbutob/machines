@@ -228,7 +228,7 @@
         <button id="homeBtn" class="btn btn-ghost hidden" onclick="goToHome()">🏠 Đổi xưởng</button>
         <button class="btn btn-ghost" onclick="loadMachines()"><span id="refreshIcon">⟳</span> Làm mới</button>
         <button id="addBtn" class="btn btn-primary hidden" style="width:auto; margin:0;" onclick="openAddModal()">+ Thêm máy</button>
-        <button id="importBtn" class="btn btn-ghost hidden" onclick="openImportModal()">📥 Nhập Excel</button>
+        <button id="importBtn" class="btn btn-ghost hidden" onclick="openImportModal()">📥 Import File</button>
         <button id="myReqBtn" class="btn btn-ghost hidden" onclick="openMyRequestsModal()">📋 Yêu cầu của tôi</button>
         <button id="reqQueueBtn" class="btn btn-ghost hidden" onclick="openRequestQueueModal()">🕒 Yêu cầu chỉnh sửa<span id="pendingCount" class="badge-count hidden">0</span></button>
         <button id="workshopMgmtBtn" class="btn btn-ghost hidden" onclick="openWorkshopModal()">🏭 Quản lý xưởng</button>
@@ -263,6 +263,10 @@
       <div class="stat-card">
         <div class="stat-label">Sử dụng / Bảo trì / Ngừng</div>
         <div class="stat-value small mono" id="statTrangThai">0 / 0 / 0</div>
+      </div>
+      <div class="stat-card hidden" id="statLyThanhCard" style="border-color:rgba(139,146,158,.4);">
+        <div class="stat-label">Đã thanh lý</div>
+        <div class="stat-value mono" id="statLyThanh" style="color:var(--muted);">0</div>
       </div>
     </div>
 
@@ -318,6 +322,7 @@
           <option>Đang sử dụng</option>
           <option>Bảo trì</option>
           <option>Ngừng hoạt động</option>
+          <option>Đã thanh lý</option>
         </select>
       </div>
       <div id="tableWrap"></div>
@@ -334,7 +339,10 @@
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div id="modalHint" class="info-msg hidden" style="margin:-4px 0 12px;"></div>
-    <div class="field"><label>Tên máy</label><input class="inp" id="mTenMay" placeholder="VD: Máy dập CNC-01"></div>
+    <div class="grid2">
+      <div class="field"><label>Mã máy (tự đặt, tuỳ chọn)</label><input class="inp" id="mMaMay" placeholder="VD: VS-01"></div>
+      <div class="field"><label>Tên máy</label><input class="inp" id="mTenMay" placeholder="VD: Máy dập CNC-01"></div>
+    </div>
     <div class="grid2">
       <div class="field"><label>Loại máy</label><input class="inp" id="mLoaiMay" placeholder="VD: Máy vắt sổ" list="machineTypeOptions"></div>
       <div class="field"><label>Xưởng sở hữu</label><input class="inp" id="mCongTy" placeholder="VD: Xưởng 1" list="companyOptions"></div>
@@ -358,7 +366,7 @@
       <div class="field">
         <label>Trạng thái</label>
         <select class="inp" id="mTrangThai">
-          <option>Đang sử dụng</option><option>Bảo trì</option><option>Ngừng hoạt động</option>
+          <option>Đang sử dụng</option><option>Bảo trì</option><option>Ngừng hoạt động</option><option>Đã thanh lý</option>
         </select>
       </div>
     </div>
@@ -476,7 +484,7 @@
 <div id="importModal" class="overlay hidden">
   <div class="modal modal-wide">
     <div class="modal-head">
-      <h3>Nhập danh sách máy từ Excel</h3>
+      <h3>Import dữ liệu máy từ file Excel</h3>
       <button class="modal-close" onclick="closeImportModal()">✕</button>
     </div>
     <p style="font-size:12px; color:var(--muted); margin:-6px 0 14px;">
@@ -493,7 +501,7 @@
     <div id="importPreview"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeImportModal()">Huỷ</button>
-      <button class="btn btn-primary" style="margin:0;" id="importConfirmBtn" onclick="confirmImport()" disabled>Nhập dữ liệu</button>
+      <button class="btn btn-primary" style="margin:0;" id="importConfirmBtn" onclick="confirmImport()" disabled>Import</button>
     </div>
   </div>
 </div>
@@ -504,15 +512,16 @@
   const STATUS_COLOR = {
     'Đang sử dụng': 'var(--green)',
     'Bảo trì': 'var(--blue)',
-    'Ngừng hoạt động': 'var(--red)'
+    'Ngừng hoạt động': 'var(--red)',
+    'Đã thanh lý': 'var(--muted)'
   };
   const COMPANY_ALL = '__ALL__';
   const ROLE_LABEL = { AdminL1: 'Admin cấp 1', AdminL2: 'Admin cấp 2', Viewer: 'Người xem' };
-  const ACTION_LABEL = { add: 'Thêm máy mới', update: 'Cập nhật máy', delete: 'Xoá máy', bulkAdd: 'Nhập Excel hàng loạt' };
+  const ACTION_LABEL = { add: 'Thêm máy mới', update: 'Cập nhật máy', delete: 'Xoá máy', bulkAdd: 'Import file hàng loạt' };
 
   // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
   // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzpw6I3lP424OJqXOD2SYlOyWfXCJGjer9XwuFS401TTuO8GPiAQl8hThz9e7i474RdDg/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyp9vjbQE5Zx27R2dPO6fsY-akSVntDwXDZp2_PS2Rf1CoSQ27RS06rv4x2Ea3LOU5j1w/exec';
 
   function apiGet(action, extraParams) {
     const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
@@ -843,12 +852,13 @@
   function renderAll() {
     renderCompanyTabs();
     const scoped = getScopedMachines();
-    renderStats(scoped);
+    const active = scoped.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }); // loại máy đã thanh lý khỏi thống kê/biểu đồ
+    renderStats(scoped, active);
     renderBorrowedInPanel();
     renderCompanyBreakdown();
     renderPivotTable();
-    renderChartLoai(scoped);
-    renderChartChuyen(scoped);
+    renderChartLoai(active);
+    renderChartChuyen(active);
     populateFilterOptions(scoped);
     populateCompanyDatalist();
     populateMachineTypeDatalist();
@@ -872,10 +882,10 @@
     }).join('');
   }
 
-  function renderStats(scoped) {
+  function renderStats(scoped, active) {
     let total = 0, status = { 'Đang sử dụng': 0, 'Bảo trì': 0, 'Ngừng hoạt động': 0 };
     const loaiSet = {}, chuyenSet = {}, congTySet = {};
-    scoped.forEach(function (m) {
+    active.forEach(function (m) {
       const qty = Number(m.SoLuong) || 0;
       total += qty;
       if (m.LoaiMay) loaiSet[m.LoaiMay] = true;
@@ -883,10 +893,21 @@
       if (m.CongTy) congTySet[m.CongTy] = true;
       if (status[m.TrangThai] !== undefined) status[m.TrangThai] += qty;
     });
+    const lyThanh = scoped.filter(function (m) { return m.TrangThai === 'Đã thanh lý'; })
+      .reduce(function (sum, m) { return sum + (Number(m.SoLuong) || 0); }, 0);
+
     document.getElementById('statTotal').textContent = total;
     document.getElementById('statLoai').textContent = Object.keys(loaiSet).length;
     document.getElementById('statChuyen').textContent = Object.keys(chuyenSet).length;
     document.getElementById('statTrangThai').textContent = status['Đang sử dụng'] + ' / ' + status['Bảo trì'] + ' / ' + status['Ngừng hoạt động'];
+
+    const lyThanhCard = document.getElementById('statLyThanhCard');
+    if (lyThanh > 0) {
+      lyThanhCard.classList.remove('hidden');
+      document.getElementById('statLyThanh').textContent = lyThanh;
+    } else {
+      lyThanhCard.classList.add('hidden');
+    }
 
     const congTyCard = document.getElementById('statCongTyCard');
     if (state.activeCompany === COMPANY_ALL && getCompanyList().length > 1) {
@@ -901,7 +922,7 @@
     if (state.activeCompany !== COMPANY_ALL || companies.length <= 1) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     const map = {};
-    state.machines.forEach(function (m) {
+    state.machines.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }).forEach(function (m) {
       const key = m.CongTy || 'Chưa gán công ty';
       if (!map[key]) map[key] = { total: 0, running: 0, maint: 0, down: 0, count: 0 };
       const qty = Number(m.SoLuong) || 0;
@@ -931,7 +952,7 @@
     panel.classList.remove('hidden');
 
     const map = {}; // { "Xưởng|Loại máy": soLuong }
-    state.machines.forEach(function (m) {
+    state.machines.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }).forEach(function (m) {
       const congTy = m.CongTy || 'Chưa gán xưởng';
       const loai = m.LoaiMay || 'Chưa phân loại';
       const key = congTy + '|' + loai;
@@ -970,6 +991,7 @@
   }
 
   function locationDisplay(m) {
+    if (m.TrangThai === 'Đã thanh lý') return { text: 'Đã thanh lý', color: STATUS_COLOR['Đã thanh lý'] };
     const v = m.ViTriLoai || 'TaiXuong';
     if (v === 'Kho') return { text: 'Kho xưởng ' + (m.CongTy || ''), color: 'var(--muted)' };
     if (v === 'Muon') return { text: (m.XuongDangMuon || 'Xưởng khác') + ' (cho mượn)', color: 'var(--purple)' };
@@ -1050,7 +1072,7 @@
       if (fLoaiMay !== 'Tất cả loại máy' && m.LoaiMay !== fLoaiMay) return false;
       if (fViTri !== 'Tất cả' && (m.ViTriLoai || 'TaiXuong') !== fViTri) return false;
       if (search) {
-        const hay = ((m.TenMay || '') + ' ' + (m.LoaiMay || '') + ' ' + (m.Chuyen || '') + ' ' + (m.CongTy || '')).toLowerCase();
+        const hay = ((m.MaMay || '') + ' ' + (m.TenMay || '') + ' ' + (m.LoaiMay || '') + ' ' + (m.Chuyen || '') + ' ' + (m.CongTy || '')).toLowerCase();
         return hay.indexOf(search) > -1;
       }
       return true;
@@ -1064,7 +1086,9 @@
     } else {
       let rows = filtered.map(function (m) {
         const loc = locationDisplay(m);
-        return '<tr>' +
+        const dimmed = m.TrangThai === 'Đã thanh lý' ? ' style="opacity:.6;"' : '';
+        return '<tr' + dimmed + '>' +
+          '<td class="mono" style="color:var(--text2); white-space:nowrap;">' + escapeHtml(m.MaMay) + '</td>' +
           '<td style="font-weight:500;">' + escapeHtml(m.TenMay) + '</td>' +
           (showCongTyCol ? '<td style="color:var(--text2);">' + escapeHtml(m.CongTy) + '</td>' : '') +
           '<td style="color:var(--text2);">' + escapeHtml(m.LoaiMay) + '</td>' +
@@ -1078,7 +1102,7 @@
         '</tr>';
       }).join('');
       wrap.innerHTML = '<div style="overflow-x:auto;"><table><thead><tr>' +
-        '<th>Tên máy</th>' + (showCongTyCol ? '<th>Xưởng sở hữu</th>' : '') + '<th>Loại máy</th><th>Hiện trạng</th><th style="text-align:right;">Số lượng</th><th>Ghi chú</th>' +
+        '<th>Mã máy</th><th>Tên máy</th>' + (showCongTyCol ? '<th>Xưởng sở hữu</th>' : '') + '<th>Loại máy</th><th>Hiện trạng</th><th style="text-align:right;">Số lượng</th><th>Ghi chú</th>' +
         (canEdit ? '<th style="text-align:right;">Thao tác</th>' : '') +
         '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
@@ -1093,6 +1117,7 @@
   function openAddModal() {
     state.editId = null;
     document.getElementById('modalTitle').textContent = 'Thêm máy mới';
+    document.getElementById('mMaMay').value = '';
     document.getElementById('mTenMay').value = '';
     document.getElementById('mLoaiMay').value = '';
     document.getElementById('mCongTy').value = state.activeCompany !== COMPANY_ALL ? state.activeCompany : '';
@@ -1113,6 +1138,7 @@
     if (!m) return;
     state.editId = id;
     document.getElementById('modalTitle').textContent = 'Sửa thông tin máy';
+    document.getElementById('mMaMay').value = m.MaMay || '';
     document.getElementById('mTenMay').value = m.TenMay || '';
     document.getElementById('mLoaiMay').value = m.LoaiMay || '';
     document.getElementById('mCongTy').value = m.CongTy || '';
@@ -1150,6 +1176,7 @@
     const viTriLoai = document.getElementById('mViTriLoai').value;
     const data = {
       ID: state.editId,
+      MaMay: document.getElementById('mMaMay').value.trim(),
       TenMay: document.getElementById('mTenMay').value.trim(),
       LoaiMay: document.getElementById('mLoaiMay').value.trim(),
       CongTy: document.getElementById('mCongTy').value.trim(),
@@ -1312,9 +1339,9 @@
       return '<div><b>Tổng số dòng:</b> ' + rows.length + '</div><div><b>Theo xưởng:</b> ' + escapeHtml(breakdown) + '</div>';
     }
     if (actionType === 'delete') {
-      return fieldRow('Tên máy', data.TenMay) + fieldRow('Loại máy', data.LoaiMay) + fieldRow('Công ty', data.CongTy) + fieldRow('Chuyền', data.Chuyen);
+      return fieldRow('Mã máy', data.MaMay) + fieldRow('Tên máy', data.TenMay) + fieldRow('Loại máy', data.LoaiMay) + fieldRow('Công ty', data.CongTy) + fieldRow('Chuyền', data.Chuyen);
     }
-    return fieldRow('Tên máy', data.TenMay) + fieldRow('Loại máy', data.LoaiMay) + fieldRow('Công ty', data.CongTy) + fieldRow('Chuyền', data.Chuyen) +
+    return fieldRow('Mã máy', data.MaMay) + fieldRow('Tên máy', data.TenMay) + fieldRow('Loại máy', data.LoaiMay) + fieldRow('Công ty', data.CongTy) + fieldRow('Chuyền', data.Chuyen) +
       fieldRow('Số lượng', data.SoLuong) + fieldRow('Trạng thái', data.TrangThai) + fieldRow('Ghi chú', data.GhiChu);
   }
 
@@ -1470,15 +1497,62 @@
   function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
 
   function downloadTemplate() {
-    const headers = ['TenMay', 'LoaiMay', 'CongTy', 'ViTriLoai', 'Chuyen', 'XuongDangMuon', 'SoLuong', 'TrangThai', 'GhiChu'];
+    const headers = ['MaMay', 'TenMay', 'LoaiMay', 'CongTy', 'ViTriLoai', 'Chuyen', 'XuongDangMuon', 'SoLuong', 'TrangThai', 'GhiChu'];
     const sample = [
-      { TenMay: 'Máy 1 kim Siruba', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Tại xưởng', Chuyen: 'Chuyền 2', XuongDangMuon: '', SoLuong: 5, TrangThai: 'Đang sử dụng', GhiChu: '' },
-      { TenMay: 'Máy vắt sổ Kansai', LoaiMay: 'Máy vắt sổ', CongTy: 'Xưởng 1', ViTriLoai: 'Kho', Chuyen: '', XuongDangMuon: '', SoLuong: 2, TrangThai: 'Đang sử dụng', GhiChu: '' },
-      { TenMay: 'Máy 1 kim Juki', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Mượn', Chuyen: '', XuongDangMuon: 'Xưởng 2', SoLuong: 1, TrangThai: 'Đang sử dụng', GhiChu: 'Cho Xưởng 2 mượn từ 01/09' }
+      { MaMay: 'VS-01', TenMay: 'Máy 1 kim Siruba', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Tại xưởng', Chuyen: 'Chuyền 2', XuongDangMuon: '', SoLuong: 5, TrangThai: 'Đang sử dụng', GhiChu: '' },
+      { MaMay: 'VS-02', TenMay: 'Máy vắt sổ Kansai', LoaiMay: 'Máy vắt sổ', CongTy: 'Xưởng 1', ViTriLoai: 'Kho', Chuyen: '', XuongDangMuon: '', SoLuong: 2, TrangThai: 'Đang sử dụng', GhiChu: '' },
+      { MaMay: 'VS-03', TenMay: 'Máy 1 kim Juki', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Mượn', Chuyen: '', XuongDangMuon: 'Xưởng 2', SoLuong: 1, TrangThai: 'Đang sử dụng', GhiChu: 'Cho Xưởng 2 mượn từ 01/09' }
     ];
     const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
+    ws['!cols'] = headers.map(function (h) { return { wch: Math.max(14, h.length + 4) }; });
+
+    // Ghi chú (comment) ngay trên từng ô tiêu đề — hover chuột vào là thấy hướng dẫn,
+    // không cần mở tab "Hướng dẫn" riêng.
+    const headerNotes = {
+      MaMay: 'Mã máy do BẠN tự đặt để phân biệt từng máy cụ thể (khác với mã hệ thống ẩn). VD: "VS-01", "VS-02". Không bắt buộc, nhưng nên đặt để dễ theo dõi khi thanh lý/luân chuyển từng máy riêng lẻ.',
+      TenMay: 'Tên đầy đủ của máy. VD: "Máy vắt sổ Siruba VS-01" (không nên viết tắt).',
+      LoaiMay: 'Loại/chủng loại máy — KHÔNG phải tên hãng. VD: "Máy vắt sổ", "Máy 1 kim", "Máy 2 kim".',
+      CongTy: 'Tên xưởng SỞ HỮU máy — không đổi dù máy đang cho xưởng khác mượn. Nên khớp đúng chính tả với tên xưởng đã thêm ở "Quản lý xưởng" trên app.',
+      ViTriLoai: 'Để TRỐNG = mặc định "Tại xưởng" (đang dùng). Nếu điền, chỉ gõ đúng 1 trong 3: "Tại xưởng" / "Kho" / "Mượn".',
+      Chuyen: 'Chỉ điền khi ViTriLoai = Tại xưởng (hoặc để trống). VD: "Chuyền 1".',
+      XuongDangMuon: 'Chỉ điền khi ViTriLoai = Mượn. VD: "Xưởng 2".',
+      SoLuong: 'Số lượng máy — số nguyên. Để trống = 0.',
+      TrangThai: 'Để trống = mặc định "Đang sử dụng". Nếu điền, chỉ gõ đúng 1 trong 4: "Đang sử dụng" / "Bảo trì" / "Ngừng hoạt động" / "Đã thanh lý" (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động).',
+      GhiChu: 'Ghi chú tự do — không bắt buộc.'
+    };
+    headers.forEach(function (h, i) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: i });
+      if (ws[cellRef] && headerNotes[h]) {
+        ws[cellRef].c = [{ a: 'Quản lý Máy móc', t: headerNotes[h] }];
+        ws[cellRef].c.hidden = true;
+      }
+    });
+
+    // Tab hướng dẫn — giải thích từng cột, ai mở file cũng đọc được ngay, không cần hover chuột
+    const guideRows = [
+      ['Cột', 'Bắt buộc?', 'Ý nghĩa', 'Giá trị hợp lệ / Ví dụ'],
+      ['MaMay', 'Không', 'Mã máy do bạn tự đặt để phân biệt từng máy cụ thể', 'VD: VS-01, VS-02... Nên đặt để dễ theo dõi khi thanh lý/luân chuyển từng máy riêng (khác với mã hệ thống ẩn, tự sinh)'],
+      ['TenMay', 'Có', 'Tên đầy đủ của máy', 'VD: Máy vắt sổ Siruba VS-01 (không viết tắt để dễ tìm kiếm)'],
+      ['LoaiMay', 'Có', 'Loại/chủng loại máy — KHÔNG phải tên hãng', 'VD: Máy vắt sổ, Máy 1 kim, Máy 2 kim, Máy kansai, Máy thùa khuy... (tên hãng như Siruba, Juki ghi trong TenMay)'],
+      ['CongTy', 'Có', 'Tên xưởng SỞ HỮU máy — không đổi dù máy đang cho xưởng khác mượn', 'Phải khớp đúng chính tả với tên xưởng đã thêm ở nút "Quản lý xưởng" trên app. VD: Xưởng 1'],
+      ['ViTriLoai', 'Không', 'Vị trí hiện tại của máy', 'Để TRỐNG = mặc định "Tại xưởng" (đang dùng). Hoặc gõ đúng 1 trong 3: Tại xưởng / Kho / Mượn'],
+      ['Chuyen', 'Không', 'Chuyền đang dùng máy', 'CHỈ điền khi ViTriLoai = Tại xưởng (hoặc để trống). VD: Chuyền 1, Chuyền 2'],
+      ['XuongDangMuon', 'Không', 'Xưởng đang mượn máy này', 'CHỈ điền khi ViTriLoai = Mượn. VD: Xưởng 2'],
+      ['SoLuong', 'Không', 'Số lượng máy', 'Số nguyên. Để trống = 0. VD: 1, 5, 20'],
+      ['TrangThai', 'Không', 'Tình trạng hoạt động của máy', 'Để trống = mặc định "Đang sử dụng". Hoặc gõ đúng 1 trong 4: Đang sử dụng / Bảo trì / Ngừng hoạt động / Đã thanh lý (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động, nhưng vẫn lưu lịch sử)'],
+      ['GhiChu', 'Không', 'Ghi chú tự do', 'VD: Cho Xưởng 2 mượn từ 01/09'],
+      [],
+      ['Lưu ý chung:'],
+      ['- Đừng xoá hay đổi tên dòng tiêu đề (dòng 1) ở tab "MayMoc".'],
+      ['- Xoá 3 dòng ví dụ trước khi điền dữ liệu thật (hoặc ghi đè lên cũng được).'],
+      ['- Gõ sai chính tả các giá trị bắt buộc đúng định dạng (ViTriLoai, TrangThai) sẽ tự hiểu về giá trị mặc định, không báo lỗi — nên kiểm tra kỹ trước khi import.']
+    ];
+    const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
+    wsGuide['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 40 }, { wch: 55 }];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'MayMoc');
+    XLSX.utils.book_append_sheet(wb, wsGuide, 'Hướng dẫn');
     XLSX.writeFile(wb, 'mau_nhap_may_moc.xlsx');
   }
 
@@ -1491,7 +1565,7 @@
   }
   function normalizeTrangThai_(raw) {
     const v = String(raw || '').trim();
-    if (v === 'Đang sử dụng' || v === 'Bảo trì' || v === 'Ngừng hoạt động') return v;
+    if (v === 'Đang sử dụng' || v === 'Bảo trì' || v === 'Ngừng hoạt động' || v === 'Đã thanh lý') return v;
     return 'Đang sử dụng';
   }
 
@@ -1503,11 +1577,14 @@
       try {
         const data = new Uint8Array(e.target.result);
         const wb = XLSX.read(data, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        // Ưu tiên đúng sheet tên "MayMoc" (đúng như file mẫu) — nếu không có thì lấy sheet đầu tiên
+        const sheetName = wb.SheetNames.indexOf('MayMoc') > -1 ? 'MayMoc' : wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
         const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
         const rows = raw.map(function (r) {
           return {
+            MaMay: String(r.MaMay || '').trim(),
             TenMay: String(r.TenMay || '').trim(),
             LoaiMay: String(r.LoaiMay || '').trim(),
             CongTy: String(r.CongTy || '').trim(),
@@ -1526,7 +1603,7 @@
         document.getElementById('importPreview').innerHTML =
           '<div class="info-msg" style="margin-top:10px;">Đọc được <b>' + rows.length + '</b> dòng máy hợp lệ' +
           (invalid > 0 ? ', <span style="color:var(--red);">' + invalid + ' dòng thiếu Loại máy/Xưởng sở hữu sẽ bị bỏ qua khi nhập</span>' : '') +
-          '. Bấm "Nhập dữ liệu" để xác nhận.</div>';
+          '. Bấm "Import" để xác nhận.</div>';
         document.getElementById('importConfirmBtn').disabled = rows.length === 0;
       } catch (err) {
         document.getElementById('importPreview').innerHTML = '<div class="err-msg">⚠ Không đọc được file: ' + (err.message || err) + '</div>';
@@ -1541,11 +1618,11 @@
     const validRows = state.importRows.filter(function (r) { return r.TenMay && r.LoaiMay && r.CongTy; });
     const btn = document.getElementById('importConfirmBtn');
     btn.disabled = true;
-    btn.textContent = 'Đang nhập...';
+    btn.textContent = 'Đang import...';
     apiPost('bulkAdd', { rows: validRows })
       .then(function (res) {
         btn.disabled = false;
-        btn.textContent = 'Nhập dữ liệu';
+        btn.textContent = 'Import';
         closeImportModal();
         if (res.queued) {
           showToast('Đã gửi yêu cầu nhập ' + res.count + ' dòng, đang chờ Admin cấp 1 duyệt.');
@@ -1553,14 +1630,14 @@
           let msg = 'Đã nhập ' + res.count + ' / ' + res.total + ' dòng.';
           showToast(msg, res.errors && res.errors.length ? 'error' : 'ok');
           if (res.errors && res.errors.length) {
-            console.warn('Lỗi khi nhập Excel:', res.errors);
+            console.warn('Lỗi khi import file:', res.errors);
           }
         }
         loadMachines();
       })
       .catch(function (err) {
         btn.disabled = false;
-        btn.textContent = 'Nhập dữ liệu';
+        btn.textContent = 'Import';
         showToast('Nhập thất bại: ' + (err.message || ''), 'error');
       });
   }
