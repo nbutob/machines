@@ -261,7 +261,7 @@
         <div class="stat-value mono" id="statChuyen">0</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Chạy / Bảo trì / Ngừng</div>
+        <div class="stat-label">Sử dụng / Bảo trì / Ngừng</div>
         <div class="stat-value small mono" id="statTrangThai">0 / 0 / 0</div>
       </div>
     </div>
@@ -290,7 +290,7 @@
         <div class="panel-head">
           <h3 style="margin:0;">Theo chuyền sản xuất</h3>
           <div class="legend">
-            <span><span class="dot" style="background:var(--green);"></span>Chạy</span>
+            <span><span class="dot" style="background:var(--green);"></span>Sử dụng</span>
             <span><span class="dot" style="background:var(--blue);"></span>Bảo trì</span>
             <span><span class="dot" style="background:var(--red);"></span>Ngừng</span>
           </div>
@@ -315,7 +315,7 @@
         <select class="select-sm" id="filterChuyen" onchange="renderTable()"><option>Tất cả</option></select>
         <select class="select-sm" id="filterTrangThai" onchange="renderTable()">
           <option>Tất cả</option>
-          <option>Đang chạy</option>
+          <option>Đang sử dụng</option>
           <option>Bảo trì</option>
           <option>Ngừng hoạt động</option>
         </select>
@@ -358,7 +358,7 @@
       <div class="field">
         <label>Trạng thái</label>
         <select class="inp" id="mTrangThai">
-          <option>Đang chạy</option><option>Bảo trì</option><option>Ngừng hoạt động</option>
+          <option>Đang sử dụng</option><option>Bảo trì</option><option>Ngừng hoạt động</option>
         </select>
       </div>
     </div>
@@ -482,7 +482,7 @@
     <p style="font-size:12px; color:var(--muted); margin:-6px 0 14px;">
       File Excel (.xlsx) cần có dòng tiêu đề đúng các cột sau (thứ tự không quan trọng):<br>
       <span class="mono" style="color:var(--text2);">TenMay, LoaiMay, CongTy, ViTriLoai, Chuyen, XuongDangMuon, SoLuong, TrangThai, GhiChu</span><br>
-      — ViTriLoai nhận: "Tại xưởng" / "Kho" / "Mượn" (để trống = Tại xưởng). TrangThai nhận: "Đang chạy" / "Bảo trì" / "Ngừng hoạt động".
+      — ViTriLoai nhận: "Tại xưởng" / "Kho" / "Mượn" (để trống = Tại xưởng). TrangThai nhận: "Đang sử dụng" / "Bảo trì" / "Ngừng hoạt động".
     </p>
     <div id="importHint" class="info-msg hidden" style="margin-bottom:12px;"></div>
     <button class="btn btn-ghost" style="margin-bottom:14px;" onclick="downloadTemplate()">⬇ Tải file mẫu (.xlsx)</button>
@@ -502,7 +502,7 @@
 
 <script>
   const STATUS_COLOR = {
-    'Đang chạy': 'var(--green)',
+    'Đang sử dụng': 'var(--green)',
     'Bảo trì': 'var(--blue)',
     'Ngừng hoạt động': 'var(--red)'
   };
@@ -512,7 +512,7 @@
 
   // ĐỔI URL này thành link Web App Apps Script của bạn (Deploy > lấy link .../exec)
   // trước khi upload file này lên GitHub Pages hoặc nơi host tĩnh khác.
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzlksBftEQSOzVuxSVcb1BTGoYo3BGH5fM9yYwR7Rhl46qWwoh9_Z29u3CLHtLjXz6ZZg/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzpw6I3lP424OJqXOD2SYlOyWfXCJGjer9XwuFS401TTuO8GPiAQl8hThz9e7i474RdDg/exec';
 
   function apiGet(action, extraParams) {
     const params = new URLSearchParams(Object.assign({ action: action, token: state.token }, extraParams || {}));
@@ -625,7 +625,7 @@
       const qty = Number(m.SoLuong) || 0;
       total += qty;
       if (m.LoaiMay) loaiSet[m.LoaiMay] = true;
-      if (m.TrangThai === 'Đang chạy') running += qty;
+      if (m.TrangThai === 'Đang sử dụng') running += qty;
       else if (m.TrangThai === 'Bảo trì') maint += qty;
       else if (m.TrangThai === 'Ngừng hoạt động') down += qty;
     });
@@ -873,7 +873,7 @@
   }
 
   function renderStats(scoped) {
-    let total = 0, status = { 'Đang chạy': 0, 'Bảo trì': 0, 'Ngừng hoạt động': 0 };
+    let total = 0, status = { 'Đang sử dụng': 0, 'Bảo trì': 0, 'Ngừng hoạt động': 0 };
     const loaiSet = {}, chuyenSet = {}, congTySet = {};
     scoped.forEach(function (m) {
       const qty = Number(m.SoLuong) || 0;
@@ -886,7 +886,7 @@
     document.getElementById('statTotal').textContent = total;
     document.getElementById('statLoai').textContent = Object.keys(loaiSet).length;
     document.getElementById('statChuyen').textContent = Object.keys(chuyenSet).length;
-    document.getElementById('statTrangThai').textContent = status['Đang chạy'] + ' / ' + status['Bảo trì'] + ' / ' + status['Ngừng hoạt động'];
+    document.getElementById('statTrangThai').textContent = status['Đang sử dụng'] + ' / ' + status['Bảo trì'] + ' / ' + status['Ngừng hoạt động'];
 
     const congTyCard = document.getElementById('statCongTyCard');
     if (state.activeCompany === COMPANY_ALL && getCompanyList().length > 1) {
@@ -906,7 +906,7 @@
       if (!map[key]) map[key] = { total: 0, running: 0, maint: 0, down: 0, count: 0 };
       const qty = Number(m.SoLuong) || 0;
       map[key].total += qty; map[key].count += 1;
-      if (m.TrangThai === 'Đang chạy') map[key].running += qty;
+      if (m.TrangThai === 'Đang sử dụng') map[key].running += qty;
       else if (m.TrangThai === 'Bảo trì') map[key].maint += qty;
       else if (m.TrangThai === 'Ngừng hoạt động') map[key].down += qty;
     });
@@ -973,8 +973,8 @@
     const v = m.ViTriLoai || 'TaiXuong';
     if (v === 'Kho') return { text: 'Kho xưởng ' + (m.CongTy || ''), color: 'var(--muted)' };
     if (v === 'Muon') return { text: (m.XuongDangMuon || 'Xưởng khác') + ' (cho mượn)', color: 'var(--purple)' };
-    const statusText = m.TrangThai === 'Đang chạy' ? 'Đang sử dụng' : (m.TrangThai || 'Đang sử dụng');
-    return { text: statusText + (m.Chuyen ? (' (' + m.Chuyen + ')') : ''), color: STATUS_COLOR[m.TrangThai] || STATUS_COLOR['Đang chạy'] };
+    const statusText = m.TrangThai || 'Đang sử dụng';
+    return { text: statusText + (m.Chuyen ? (' (' + m.Chuyen + ')') : ''), color: STATUS_COLOR[m.TrangThai] || STATUS_COLOR['Đang sử dụng'] };
   }
 
   function renderChartChuyen(scoped) {
@@ -984,7 +984,7 @@
       if (!map[key]) map[key] = { total: 0, running: 0, maint: 0, down: 0, count: 0 };
       const qty = Number(m.SoLuong) || 0;
       map[key].total += qty; map[key].count += 1;
-      if (m.TrangThai === 'Đang chạy') map[key].running += qty;
+      if (m.TrangThai === 'Đang sử dụng') map[key].running += qty;
       else if (m.TrangThai === 'Bảo trì') map[key].maint += qty;
       else if (m.TrangThai === 'Ngừng hoạt động') map[key].down += qty;
     });
@@ -1100,7 +1100,7 @@
     document.getElementById('mChuyen').value = '';
     document.getElementById('mXuongDangMuon').value = '';
     document.getElementById('mSoLuong').value = 1;
-    document.getElementById('mTrangThai').value = 'Đang chạy';
+    document.getElementById('mTrangThai').value = 'Đang sử dụng';
     document.getElementById('mGhiChu').value = '';
     document.getElementById('saveBtn').textContent = 'Thêm máy';
     toggleModalHint();
@@ -1120,7 +1120,7 @@
     document.getElementById('mChuyen').value = m.Chuyen || '';
     document.getElementById('mXuongDangMuon').value = m.XuongDangMuon || '';
     document.getElementById('mSoLuong').value = m.SoLuong || 0;
-    document.getElementById('mTrangThai').value = m.TrangThai || 'Đang chạy';
+    document.getElementById('mTrangThai').value = m.TrangThai || 'Đang sử dụng';
     document.getElementById('mGhiChu').value = m.GhiChu || '';
     document.getElementById('saveBtn').textContent = 'Lưu thay đổi';
     toggleModalHint();
@@ -1472,9 +1472,9 @@
   function downloadTemplate() {
     const headers = ['TenMay', 'LoaiMay', 'CongTy', 'ViTriLoai', 'Chuyen', 'XuongDangMuon', 'SoLuong', 'TrangThai', 'GhiChu'];
     const sample = [
-      { TenMay: 'Máy 1 kim Siruba', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Tại xưởng', Chuyen: 'Chuyền 2', XuongDangMuon: '', SoLuong: 5, TrangThai: 'Đang chạy', GhiChu: '' },
-      { TenMay: 'Máy vắt sổ Kansai', LoaiMay: 'Máy vắt sổ', CongTy: 'Xưởng 1', ViTriLoai: 'Kho', Chuyen: '', XuongDangMuon: '', SoLuong: 2, TrangThai: 'Đang chạy', GhiChu: '' },
-      { TenMay: 'Máy 1 kim Juki', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Mượn', Chuyen: '', XuongDangMuon: 'Xưởng 2', SoLuong: 1, TrangThai: 'Đang chạy', GhiChu: 'Cho Xưởng 2 mượn từ 01/09' }
+      { TenMay: 'Máy 1 kim Siruba', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Tại xưởng', Chuyen: 'Chuyền 2', XuongDangMuon: '', SoLuong: 5, TrangThai: 'Đang sử dụng', GhiChu: '' },
+      { TenMay: 'Máy vắt sổ Kansai', LoaiMay: 'Máy vắt sổ', CongTy: 'Xưởng 1', ViTriLoai: 'Kho', Chuyen: '', XuongDangMuon: '', SoLuong: 2, TrangThai: 'Đang sử dụng', GhiChu: '' },
+      { TenMay: 'Máy 1 kim Juki', LoaiMay: 'Máy 1 kim', CongTy: 'Xưởng 1', ViTriLoai: 'Mượn', Chuyen: '', XuongDangMuon: 'Xưởng 2', SoLuong: 1, TrangThai: 'Đang sử dụng', GhiChu: 'Cho Xưởng 2 mượn từ 01/09' }
     ];
     const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
     const wb = XLSX.utils.book_new();
@@ -1491,8 +1491,8 @@
   }
   function normalizeTrangThai_(raw) {
     const v = String(raw || '').trim();
-    if (v === 'Đang chạy' || v === 'Bảo trì' || v === 'Ngừng hoạt động') return v;
-    return 'Đang chạy';
+    if (v === 'Đang sử dụng' || v === 'Bảo trì' || v === 'Ngừng hoạt động') return v;
+    return 'Đang sử dụng';
   }
 
   function handleImportFile(evt) {
