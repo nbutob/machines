@@ -265,7 +265,7 @@
         <div class="stat-value small mono" id="statTrangThai">0 / 0 / 0</div>
       </div>
       <div class="stat-card hidden" id="statLyThanhCard" style="border-color:rgba(139,146,158,.4);">
-        <div class="stat-label">Đã thanh lý</div>
+        <div class="stat-label">Thanh lý</div>
         <div class="stat-value mono" id="statLyThanh" style="color:var(--muted);">0</div>
       </div>
     </div>
@@ -322,7 +322,7 @@
           <option>Đang sử dụng</option>
           <option>Bảo trì</option>
           <option>Ngừng hoạt động</option>
-          <option>Đã thanh lý</option>
+          <option>Thanh lý</option>
         </select>
       </div>
       <div id="tableWrap"></div>
@@ -366,7 +366,7 @@
       <div class="field">
         <label>Trạng thái</label>
         <select class="inp" id="mTrangThai">
-          <option>Đang sử dụng</option><option>Bảo trì</option><option>Ngừng hoạt động</option><option>Đã thanh lý</option>
+          <option>Đang sử dụng</option><option>Bảo trì</option><option>Ngừng hoạt động</option><option>Thanh lý</option>
         </select>
       </div>
     </div>
@@ -513,7 +513,7 @@
     'Đang sử dụng': 'var(--green)',
     'Bảo trì': 'var(--blue)',
     'Ngừng hoạt động': 'var(--red)',
-    'Đã thanh lý': 'var(--muted)'
+    'Thanh lý': 'var(--muted)'
   };
   const COMPANY_ALL = '__ALL__';
   const ROLE_LABEL = { AdminL1: 'Admin cấp 1', AdminL2: 'Admin cấp 2', Viewer: 'Người xem' };
@@ -852,7 +852,7 @@
   function renderAll() {
     renderCompanyTabs();
     const scoped = getScopedMachines();
-    const active = scoped.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }); // loại máy đã thanh lý khỏi thống kê/biểu đồ
+    const active = scoped.filter(function (m) { return m.TrangThai !== 'Thanh lý'; }); // loại máy đã thanh lý khỏi thống kê/biểu đồ
     renderStats(scoped, active);
     renderBorrowedInPanel();
     renderCompanyBreakdown();
@@ -893,7 +893,7 @@
       if (m.CongTy) congTySet[m.CongTy] = true;
       if (status[m.TrangThai] !== undefined) status[m.TrangThai] += qty;
     });
-    const lyThanh = scoped.filter(function (m) { return m.TrangThai === 'Đã thanh lý'; })
+    const lyThanh = scoped.filter(function (m) { return m.TrangThai === 'Thanh lý'; })
       .reduce(function (sum, m) { return sum + (Number(m.SoLuong) || 0); }, 0);
 
     document.getElementById('statTotal').textContent = total;
@@ -922,7 +922,7 @@
     if (state.activeCompany !== COMPANY_ALL || companies.length <= 1) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     const map = {};
-    state.machines.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }).forEach(function (m) {
+    state.machines.filter(function (m) { return m.TrangThai !== 'Thanh lý'; }).forEach(function (m) {
       const key = m.CongTy || 'Chưa gán công ty';
       if (!map[key]) map[key] = { total: 0, running: 0, maint: 0, down: 0, count: 0 };
       const qty = Number(m.SoLuong) || 0;
@@ -952,7 +952,7 @@
     panel.classList.remove('hidden');
 
     const map = {}; // { "Xưởng|Loại máy": soLuong }
-    state.machines.filter(function (m) { return m.TrangThai !== 'Đã thanh lý'; }).forEach(function (m) {
+    state.machines.filter(function (m) { return m.TrangThai !== 'Thanh lý'; }).forEach(function (m) {
       const congTy = m.CongTy || 'Chưa gán xưởng';
       const loai = m.LoaiMay || 'Chưa phân loại';
       const key = congTy + '|' + loai;
@@ -991,7 +991,7 @@
   }
 
   function locationDisplay(m) {
-    if (m.TrangThai === 'Đã thanh lý') return { text: 'Đã thanh lý', color: STATUS_COLOR['Đã thanh lý'] };
+    if (m.TrangThai === 'Thanh lý') return { text: 'Thanh lý', color: STATUS_COLOR['Thanh lý'] };
     const v = m.ViTriLoai || 'TaiXuong';
     if (v === 'Kho') return { text: 'Kho xưởng ' + (m.CongTy || ''), color: 'var(--muted)' };
     if (v === 'Muon') return { text: (m.XuongDangMuon || 'Xưởng khác') + ' (cho mượn)', color: 'var(--purple)' };
@@ -1086,7 +1086,7 @@
     } else {
       let rows = filtered.map(function (m) {
         const loc = locationDisplay(m);
-        const dimmed = m.TrangThai === 'Đã thanh lý' ? ' style="opacity:.6;"' : '';
+        const dimmed = m.TrangThai === 'Thanh lý' ? ' style="opacity:.6;"' : '';
         return '<tr' + dimmed + '>' +
           '<td class="mono" style="color:var(--text2); white-space:nowrap;">' + escapeHtml(m.MaMay) + '</td>' +
           '<td style="font-weight:500;">' + escapeHtml(m.TenMay) + '</td>' +
@@ -1529,7 +1529,7 @@
       Chuyen: 'Chỉ điền khi ViTriLoai = Tại xưởng (hoặc để trống). VD: "Chuyền 1".',
       XuongDangMuon: 'Chỉ điền khi ViTriLoai = Mượn. VD: "Xưởng 2".',
       SoLuong: 'Số lượng máy — số nguyên. Để trống = 0.',
-      TrangThai: 'Để trống = mặc định "Đang sử dụng". Nếu điền, chỉ gõ đúng 1 trong 4: "Đang sử dụng" / "Bảo trì" / "Ngừng hoạt động" / "Đã thanh lý" (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động).',
+      TrangThai: 'Để trống = mặc định "Đang sử dụng". Nếu điền, chỉ gõ đúng 1 trong 4: "Đang sử dụng" / "Bảo trì" / "Ngừng hoạt động" / "Thanh lý" (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động).',
       GhiChu: 'Ghi chú tự do — không bắt buộc.'
     };
     headers.forEach(function (h, i) {
@@ -1551,7 +1551,7 @@
       ['Chuyen', 'Không', 'Chuyền đang dùng máy', 'CHỈ điền khi ViTriLoai = Tại xưởng (hoặc để trống). VD: Chuyền 1, Chuyền 2'],
       ['XuongDangMuon', 'Không', 'Xưởng đang mượn máy này', 'CHỈ điền khi ViTriLoai = Mượn. VD: Xưởng 2'],
       ['SoLuong', 'Không', 'Số lượng máy', 'Số nguyên. Để trống = 0. VD: 1, 5, 20'],
-      ['TrangThai', 'Không', 'Tình trạng hoạt động của máy', 'Để trống = mặc định "Đang sử dụng". Hoặc gõ đúng 1 trong 4: Đang sử dụng / Bảo trì / Ngừng hoạt động / Đã thanh lý (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động, nhưng vẫn lưu lịch sử)'],
+      ['TrangThai', 'Không', 'Tình trạng hoạt động của máy', 'Để trống = mặc định "Đang sử dụng". Hoặc gõ đúng 1 trong 4: Đang sử dụng / Bảo trì / Ngừng hoạt động / Thanh lý (máy đã bán/thanh lý sẽ không tính vào tổng số máy đang hoạt động, nhưng vẫn lưu lịch sử)'],
       ['GhiChu', 'Không', 'Ghi chú tự do', 'VD: Cho Xưởng 2 mượn từ 01/09'],
       [],
       ['Lưu ý chung:'],
@@ -1577,7 +1577,7 @@
   }
   function normalizeTrangThai_(raw) {
     const v = String(raw || '').trim();
-    if (v === 'Đang sử dụng' || v === 'Bảo trì' || v === 'Ngừng hoạt động' || v === 'Đã thanh lý') return v;
+    if (v === 'Đang sử dụng' || v === 'Bảo trì' || v === 'Ngừng hoạt động' || v === 'Thanh lý') return v;
     return 'Đang sử dụng';
   }
 
